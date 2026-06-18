@@ -100,13 +100,16 @@ class LightGBMBenchmark(AnomalyDetector):
             raise RuntimeError(msg)
         path.mkdir(parents=True, exist_ok=True)
         joblib.dump(self._model, path / "model.joblib")
-        self.save_metadata(path, extra={
-            "n_estimators": self._n_estimators,
-            "max_depth": self._max_depth,
-            "learning_rate": self._learning_rate,
-            "num_leaves": self._num_leaves,
-            "note": "SUPERVISED UPPER-BOUND BENCHMARK — NOT for production anomaly detection",
-        })
+        self.save_metadata(
+            path,
+            extra={
+                "n_estimators": self._n_estimators,
+                "max_depth": self._max_depth,
+                "learning_rate": self._learning_rate,
+                "num_leaves": self._num_leaves,
+                "note": "SUPERVISED UPPER-BOUND BENCHMARK — NOT for production anomaly detection",
+            },
+        )
         logger.info("model_saved", model=self.name, path=str(path))
 
     @classmethod

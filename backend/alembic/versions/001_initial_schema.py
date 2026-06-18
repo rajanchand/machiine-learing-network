@@ -137,14 +137,18 @@ def upgrade() -> None:
         ),
         sa.Column(
             "severity",
-            postgresql.ENUM("low", "medium", "high", "critical", name="alertseverity", create_type=False),
+            postgresql.ENUM(
+                "low", "medium", "high", "critical", name="alertseverity", create_type=False
+            ),
             nullable=False,
             server_default="medium",
         ),
         sa.Column("suspected_attack_type", sa.String(64), nullable=True),
         sa.Column(
             "status",
-            postgresql.ENUM("open", "acknowledged", "resolved", name="alertstatus", create_type=False),
+            postgresql.ENUM(
+                "open", "acknowledged", "resolved", name="alertstatus", create_type=False
+            ),
             nullable=False,
             server_default="open",
         ),

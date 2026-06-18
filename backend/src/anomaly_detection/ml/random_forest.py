@@ -77,11 +77,14 @@ class RandomForestDetector(AnomalyDetector):
             raise RuntimeError(msg)
         path.mkdir(parents=True, exist_ok=True)
         joblib.dump(self._model, path / "model.joblib")
-        self.save_metadata(path, extra={
-            "n_estimators": self._n_estimators,
-            "max_depth": self._max_depth,
-            "class_weight": "balanced",
-        })
+        self.save_metadata(
+            path,
+            extra={
+                "n_estimators": self._n_estimators,
+                "max_depth": self._max_depth,
+                "class_weight": "balanced",
+            },
+        )
         logger.info("model_saved", model=self.name, path=str(path))
 
     @classmethod

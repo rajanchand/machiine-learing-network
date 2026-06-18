@@ -182,8 +182,17 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
     # Convert all feature columns to numeric where possible
-    exclude_cols = {"Flow ID", "Source IP", "Destination IP", "label", "timestamp", "Timestamp",
-                    "Source Port", "Destination Port", "Protocol"}
+    exclude_cols = {
+        "Flow ID",
+        "Source IP",
+        "Destination IP",
+        "label",
+        "timestamp",
+        "Timestamp",
+        "Source Port",
+        "Destination Port",
+        "Protocol",
+    }
     for col in df.columns:
         if col not in exclude_cols and df[col].dtype == object:
             df[col] = pd.to_numeric(df[col], errors="coerce")

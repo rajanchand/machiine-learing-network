@@ -120,7 +120,9 @@ async def batch_inference(
             latency = time.perf_counter() - t0
             app = request.app
             app.state.metrics_inference_count = getattr(app.state, "metrics_inference_count", 0) + 1
-            app.state.metrics_inference_sum = getattr(app.state, "metrics_inference_sum", 0.0) + latency
+            app.state.metrics_inference_sum = (
+                getattr(app.state, "metrics_inference_sum", 0.0) + latency
+            )
 
             prediction = Prediction(
                 flow_id=flow.id,
@@ -134,12 +136,14 @@ async def batch_inference(
             predictions_db.append(prediction)
 
             if is_anomaly:
-                session.add(Alert(
-                    flow_id=flow.id,
-                    severity=_determine_severity(score, threshold),
-                    suspected_attack_type=flow_create.label,
-                    status=AlertStatus.OPEN,
-                ))
+                session.add(
+                    Alert(
+                        flow_id=flow.id,
+                        severity=_determine_severity(score, threshold),
+                        suspected_attack_type=flow_create.label,
+                        status=AlertStatus.OPEN,
+                    )
+                )
 
         # Single flush for the whole batch, then commit.
         await session.flush()
@@ -179,8 +183,12 @@ async def stream_inference(
             score, is_anomaly, model_name, threshold = 0.0, False, "error", 0.5
 
         latency = time.perf_counter() - t0
-        request.app.state.metrics_inference_count = getattr(request.app.state, "metrics_inference_count", 0) + 1
-        request.app.state.metrics_inference_sum = getattr(request.app.state, "metrics_inference_sum", 0.0) + latency
+        request.app.state.metrics_inference_count = (
+            getattr(request.app.state, "metrics_inference_count", 0) + 1
+        )
+        request.app.state.metrics_inference_sum = (
+            getattr(request.app.state, "metrics_inference_sum", 0.0) + latency
+        )
 
         prediction = Prediction(
             flow_id=flow.id,
@@ -210,20 +218,22 @@ async def stream_inference(
 
         await session.commit()
 
-    await _broadcast_event(StreamEvent(
-        event_type="flow",
-        flow_id=flow.id,
-        ts=flow.ts,
-        src_ip=flow.src_ip,
-        dst_ip=flow.dst_ip,
-        protocol=flow.protocol,
-        score=score,
-        is_anomaly=is_anomaly,
-        model_name=model_name,
-        alert_id=alert_id,
-        severity=severity_str,
-        suspected_attack_type=flow_create.label,
-    ))
+    await _broadcast_event(
+        StreamEvent(
+            event_type="flow",
+            flow_id=flow.id,
+            ts=flow.ts,
+            src_ip=flow.src_ip,
+            dst_ip=flow.dst_ip,
+            protocol=flow.protocol,
+            score=score,
+            is_anomaly=is_anomaly,
+            model_name=model_name,
+            alert_id=alert_id,
+            severity=severity_str,
+            suspected_attack_type=flow_create.label,
+        )
+    )
 
     return PredictionResponse.model_validate(prediction)
 

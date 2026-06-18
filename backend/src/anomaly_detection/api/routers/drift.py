@@ -35,7 +35,9 @@ def _get_session(request: Request) -> AsyncSession:
     return cast("AsyncSession", factory())
 
 
-def calculate_feature_psi(expected_values: pd.Series, actual_values: list[float], num_bins: int = 10) -> float:
+def calculate_feature_psi(
+    expected_values: pd.Series, actual_values: list[float], num_bins: int = 10
+) -> float:
     """Calculate Population Stability Index (PSI) for a single feature."""
     if len(expected_values) == 0 or len(actual_values) == 0:
         return 0.0
@@ -96,20 +98,48 @@ async def get_drift(request: Request) -> DriftResponse:
 
     # 2. Fetch recent actual flows from DB
     async with _get_session(request) as session:
-        result = await session.execute(
-            select(Flow).order_by(desc(Flow.ts)).limit(500)
-        )
+        result = await session.execute(select(Flow).order_by(desc(Flow.ts)).limit(500))
         recent_flows = result.scalars().all()
 
     # Define numeric features list
     feature_cols = [
-        'flow_duration', 'total_fwd_packets', 'total_bwd_packets', 'total_len_fwd_packets', 'total_len_bwd_packets',
-        'fwd_packet_len_max', 'fwd_packet_len_min', 'fwd_packet_len_mean', 'fwd_packet_len_std', 'bwd_packet_len_max',
-        'bwd_packet_len_min', 'bwd_packet_len_mean', 'bwd_packet_len_std', 'flow_bytes_per_s', 'flow_packets_per_s',
-        'fin_flag_count', 'syn_flag_count', 'rst_flag_count', 'psh_flag_count', 'ack_flag_count', 'urg_flag_count',
-        'flow_iat_mean', 'flow_iat_std', 'flow_iat_max', 'flow_iat_min', 'fwd_iat_mean', 'fwd_iat_std', 'fwd_iat_max',
-        'fwd_iat_min', 'bwd_iat_mean', 'bwd_iat_std', 'bwd_iat_max', 'bwd_iat_min', 'down_up_ratio', 'avg_packet_size',
-        'avg_fwd_segment_size', 'avg_bwd_segment_size'
+        "flow_duration",
+        "total_fwd_packets",
+        "total_bwd_packets",
+        "total_len_fwd_packets",
+        "total_len_bwd_packets",
+        "fwd_packet_len_max",
+        "fwd_packet_len_min",
+        "fwd_packet_len_mean",
+        "fwd_packet_len_std",
+        "bwd_packet_len_max",
+        "bwd_packet_len_min",
+        "bwd_packet_len_mean",
+        "bwd_packet_len_std",
+        "flow_bytes_per_s",
+        "flow_packets_per_s",
+        "fin_flag_count",
+        "syn_flag_count",
+        "rst_flag_count",
+        "psh_flag_count",
+        "ack_flag_count",
+        "urg_flag_count",
+        "flow_iat_mean",
+        "flow_iat_std",
+        "flow_iat_max",
+        "flow_iat_min",
+        "fwd_iat_mean",
+        "fwd_iat_std",
+        "fwd_iat_max",
+        "fwd_iat_min",
+        "bwd_iat_mean",
+        "bwd_iat_std",
+        "bwd_iat_max",
+        "bwd_iat_min",
+        "down_up_ratio",
+        "avg_packet_size",
+        "avg_fwd_segment_size",
+        "avg_bwd_segment_size",
     ]
 
     # If not enough actual data (< 10 flows), return default stable response
@@ -121,7 +151,7 @@ async def get_drift(request: Request) -> DriftResponse:
             threshold=0.25,
             system_notice=None,
             ts=datetime.now(),
-            feature_psis=feature_psis
+            feature_psis=feature_psis,
         )
 
     # 3. Calculate PSI per feature
@@ -145,11 +175,7 @@ async def get_drift(request: Request) -> DriftResponse:
 
     # 4. Persist drift reading to DB
     async with _get_session(request) as session:
-        reading = DriftReading(
-            ts=now,
-            overall_psi=overall_psi,
-            feature_psis=feature_psis
-        )
+        reading = DriftReading(ts=now, overall_psi=overall_psi, feature_psis=feature_psis)
         session.add(reading)
         await session.commit()
 
@@ -159,5 +185,5 @@ async def get_drift(request: Request) -> DriftResponse:
         threshold=threshold,
         system_notice=system_notice,
         ts=now,
-        feature_psis=feature_psis
+        feature_psis=feature_psis,
     )

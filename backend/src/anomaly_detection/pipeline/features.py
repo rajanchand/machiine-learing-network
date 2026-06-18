@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from anomaly_detection.logging import get_logger
 from anomaly_detection.constants import FEATURE_COLUMNS
+from anomaly_detection.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -119,9 +119,14 @@ def extract_features(df: pd.DataFrame) -> pd.DataFrame:
 
     # Ensure integer columns are int
     int_cols = [
-        "total_fwd_packets", "total_bwd_packets",
-        "fin_flag_count", "syn_flag_count", "rst_flag_count",
-        "psh_flag_count", "ack_flag_count", "urg_flag_count",
+        "total_fwd_packets",
+        "total_bwd_packets",
+        "fin_flag_count",
+        "syn_flag_count",
+        "rst_flag_count",
+        "psh_flag_count",
+        "ack_flag_count",
+        "urg_flag_count",
     ]
     for col in int_cols:
         if col in result.columns:

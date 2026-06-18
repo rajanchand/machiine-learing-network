@@ -280,8 +280,6 @@ def generate_fixture(output_path: Path, num_rows: int = 3000) -> None:
 
 
 if __name__ == "__main__":
-    fixture_path = (
-        Path(__file__).resolve().parents[4] / "data" / "fixtures" / "nsl_kdd_sample.csv"
-    )
+    fixture_path = Path(__file__).resolve().parents[4] / "data" / "fixtures" / "nsl_kdd_sample.csv"
     generate_fixture(fixture_path)
     print(f"Generated NSL-KDD fixture at {fixture_path}")

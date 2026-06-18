@@ -39,6 +39,7 @@ def create_engine(settings: Settings) -> AsyncEngine:
     )
 
     if "sqlite" in settings.database_url:
+
         @event.listens_for(engine.sync_engine, "connect")
         def register_sqlite_functions(dbapi_connection: Any, connection_record: Any) -> None:
             def date_trunc(field: Any, dt_str: Any) -> Any:
@@ -48,6 +49,7 @@ def create_engine(settings: Settings) -> AsyncEngine:
                 # Replacing 'T' with ' ' for consistency if ISO formatted
                 val = str(dt_str).replace("T", " ")
                 return val[:16] + ":00"
+
             dbapi_connection.create_function("date_trunc", 2, date_trunc)
 
     return engine

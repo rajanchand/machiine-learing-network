@@ -79,15 +79,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 inference_service.set_threshold(model_name, seed_threshold)
 
                 model_path = settings.model_registry_path / model_name / "v1"
-                session.add(MLModel(
-                    name=model_name,
-                    version="v1",
-                    metrics_json=metrics,
-                    artifact_path=str(model_path),
-                    threshold=seed_threshold,
-                    is_active=(model_name == inference_service.active_model_name),
-                    description=f"Auto-registered {model_name} v1",
-                ))
+                session.add(
+                    MLModel(
+                        name=model_name,
+                        version="v1",
+                        metrics_json=metrics,
+                        artifact_path=str(model_path),
+                        threshold=seed_threshold,
+                        is_active=(model_name == inference_service.active_model_name),
+                        description=f"Auto-registered {model_name} v1",
+                    )
+                )
             else:
                 inference_service.set_threshold(model_name, existing.threshold)
                 if existing.is_active:
@@ -148,20 +150,16 @@ def create_app() -> FastAPI:
         async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
             path = request.url.path
 
-            if (
-                path in _OPEN_PATHS
-                or path.startswith("/docs")
-                or path.startswith("/openapi.json")
-            ):
+            if path in _OPEN_PATHS or path.startswith("/docs") or path.startswith("/openapi.json"):
                 return await call_next(request)
 
             is_simulator_route = path in _SIMULATOR_ROUTES
             is_local = request.client is not None and request.client.host in (
-                "127.0.0.1", "::1", "localhost"
+                "127.0.0.1",
+                "::1",
+                "localhost",
             )
-            has_api_key = (
-                request.headers.get("X-API-Key") == settings.simulator_api_key
-            )
+            has_api_key = request.headers.get("X-API-Key") == settings.simulator_api_key
 
             if is_simulator_route and (is_local or has_api_key):
                 return await call_next(request)
@@ -243,23 +241,25 @@ def create_app() -> FastAPI:
         latency_count = getattr(app.state, "metrics_inference_count", 0)
         latency_sum = getattr(app.state, "metrics_inference_sum", 0.0)
 
-        body = "\n".join([
-            "# HELP flows_processed_total Total network flows processed.",
-            "# TYPE flows_processed_total counter",
-            f"flows_processed_total {flows_count}",
-            "# HELP alerts_raised_total Total anomaly alerts raised.",
-            "# TYPE alerts_raised_total counter",
-            f"alerts_raised_total {alerts_count}",
-            "# HELP inference_latency_seconds_count Inference measurement count.",
-            "# TYPE inference_latency_seconds_count counter",
-            f"inference_latency_seconds_count {latency_count}",
-            "# HELP inference_latency_seconds_sum Sum of inference latencies.",
-            "# TYPE inference_latency_seconds_sum counter",
-            f"inference_latency_seconds_sum {latency_sum:.6f}",
-            "# HELP active_model_version Active model gauge.",
-            "# TYPE active_model_version gauge",
-            f'active_model_version{{model="{active_model}",version="v1"}} 1',
-        ])
+        body = "\n".join(
+            [
+                "# HELP flows_processed_total Total network flows processed.",
+                "# TYPE flows_processed_total counter",
+                f"flows_processed_total {flows_count}",
+                "# HELP alerts_raised_total Total anomaly alerts raised.",
+                "# TYPE alerts_raised_total counter",
+                f"alerts_raised_total {alerts_count}",
+                "# HELP inference_latency_seconds_count Inference measurement count.",
+                "# TYPE inference_latency_seconds_count counter",
+                f"inference_latency_seconds_count {latency_count}",
+                "# HELP inference_latency_seconds_sum Sum of inference latencies.",
+                "# TYPE inference_latency_seconds_sum counter",
+                f"inference_latency_seconds_sum {latency_sum:.6f}",
+                "# HELP active_model_version Active model gauge.",
+                "# TYPE active_model_version gauge",
+                f'active_model_version{{model="{active_model}",version="v1"}} 1',
+            ]
+        )
         return Response(content=body + "\n", media_type="text/plain")
 
     from anomaly_detection.api.routers.alerts import router as alerts_router

@@ -16,6 +16,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from anomaly_detection.constants import FEATURE_COLUMNS
 from anomaly_detection.logging import get_logger, setup_logging
 from anomaly_detection.ml.autoencoder import AutoEncoderDetector
 from anomaly_detection.ml.halfspace_trees import HalfSpaceTreesDetector
@@ -23,7 +24,6 @@ from anomaly_detection.ml.isolation_forest import IsolationForestDetector
 from anomaly_detection.ml.lightgbm_model import LightGBMBenchmark
 from anomaly_detection.ml.random_forest import RandomForestDetector
 from anomaly_detection.ml.xgboost_model import XGBoostDetector
-from anomaly_detection.constants import FEATURE_COLUMNS
 
 logger = get_logger(__name__)
 

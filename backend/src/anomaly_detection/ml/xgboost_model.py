@@ -83,12 +83,15 @@ class XGBoostDetector(AnomalyDetector):
             raise RuntimeError(msg)
         path.mkdir(parents=True, exist_ok=True)
         joblib.dump(self._model, path / "model.joblib")
-        self.save_metadata(path, extra={
-            "n_estimators": self._n_estimators,
-            "max_depth": self._max_depth,
-            "learning_rate": self._learning_rate,
-            "scale_pos_weight": self._scale_pos_weight,
-        })
+        self.save_metadata(
+            path,
+            extra={
+                "n_estimators": self._n_estimators,
+                "max_depth": self._max_depth,
+                "learning_rate": self._learning_rate,
+                "scale_pos_weight": self._scale_pos_weight,
+            },
+        )
         logger.info("model_saved", model=self.name, path=str(path))
 
     @classmethod

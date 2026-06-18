@@ -47,7 +47,7 @@ class Settings(BaseSettings):
 
     # Rate limiting
     login_rate_limit: int = 10  # max login attempts per minute per IP
-    batch_max_size: int = 500   # max flows per batch request
+    batch_max_size: int = 500  # max flows per batch request
 
     # Model registry and data paths
     model_registry_path: Path = Path("/app/models")

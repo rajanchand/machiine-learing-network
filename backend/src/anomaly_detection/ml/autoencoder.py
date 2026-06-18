@@ -111,20 +111,24 @@ class AutoEncoderDetector(AnomalyDetector):
             raise RuntimeError(msg)
         path.mkdir(parents=True, exist_ok=True)
         joblib.dump(self._model, path / "model.joblib")
-        self.save_metadata(path, extra={
-            "hidden_neurons": self._hidden_neurons,
-            "epochs": self._epochs,
-            "batch_size": self._batch_size,
-            "contamination": self._contamination,
-            "train_score_min": self._train_score_min,
-            "train_score_max": self._train_score_max,
-        })
+        self.save_metadata(
+            path,
+            extra={
+                "hidden_neurons": self._hidden_neurons,
+                "epochs": self._epochs,
+                "batch_size": self._batch_size,
+                "contamination": self._contamination,
+                "train_score_min": self._train_score_min,
+                "train_score_max": self._train_score_max,
+            },
+        )
         logger.info("model_saved", model=self.name, path=str(path))
 
     @classmethod
     def load(cls, path: Path) -> AutoEncoderDetector:
         """Load model from disk."""
         import json
+
         instance = cls()
         instance._model = joblib.load(path / "model.joblib")
         # Restore training-set score range if available

@@ -14,9 +14,9 @@ import joblib
 import numpy as np
 from river import anomaly, compose, preprocessing
 
+from anomaly_detection.constants import FEATURE_COLUMNS
 from anomaly_detection.logging import get_logger
 from anomaly_detection.ml.base import AnomalyDetector
-from anomaly_detection.constants import FEATURE_COLUMNS
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -126,12 +126,15 @@ class HalfSpaceTreesDetector(AnomalyDetector):
         """Save model to disk."""
         path.mkdir(parents=True, exist_ok=True)
         joblib.dump(self._model, path / "model.joblib")
-        self.save_metadata(path, extra={
-            "n_trees": self._n_trees,
-            "height": self._height,
-            "window_size": self._window_size,
-            "seed": self._seed,
-        })
+        self.save_metadata(
+            path,
+            extra={
+                "n_trees": self._n_trees,
+                "height": self._height,
+                "window_size": self._window_size,
+                "seed": self._seed,
+            },
+        )
         logger.info("model_saved", model=self.name, path=str(path))
 
     @classmethod

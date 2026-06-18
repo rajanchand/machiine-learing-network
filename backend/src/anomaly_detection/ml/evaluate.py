@@ -34,8 +34,8 @@ from sklearn.metrics import (
     roc_curve,
 )
 
-from anomaly_detection.logging import get_logger, setup_logging
 from anomaly_detection.constants import FEATURE_COLUMNS
+from anomaly_detection.logging import get_logger, setup_logging
 from anomaly_detection.ml.autoencoder import AutoEncoderDetector
 from anomaly_detection.ml.base import AnomalyDetector
 from anomaly_detection.ml.halfspace_trees import HalfSpaceTreesDetector
@@ -194,10 +194,7 @@ def evaluate_model(
         latencies: list[float] = []
         sample_count = min(100, X_test.shape[0])
         for i in range(sample_count):
-            sample = {
-                FEATURE_COLUMNS[j]: float(X_test[i, j])
-                for j in range(X_test.shape[1])
-            }
+            sample = {FEATURE_COLUMNS[j]: float(X_test[i, j]) for j in range(X_test.shape[1])}
             _, latency = model.score_one_with_latency(sample)
             latencies.append(latency)
         detection_latency_ms = float(np.mean(latencies) * 1000)
@@ -247,8 +244,9 @@ def plot_roc_curves(
     for (name, scores), color in zip(all_scores.items(), colors, strict=False):
         fpr_values, tpr_values, _ = roc_curve(y_test, scores)
         roc_auc_val = auc(fpr_values, tpr_values)
-        ax.plot(fpr_values, tpr_values, color=color, lw=2,
-                label=f"{name} (AUC = {roc_auc_val:.3f})")
+        ax.plot(
+            fpr_values, tpr_values, color=color, lw=2, label=f"{name} (AUC = {roc_auc_val:.3f})"
+        )
 
     ax.plot([0, 1], [0, 1], "k--", lw=1, alpha=0.5)
     ax.set_xlabel("False Positive Rate", fontsize=12)
@@ -274,8 +272,7 @@ def plot_pr_curves(
     for (name, scores), color in zip(all_scores.items(), colors, strict=False):
         prec, rec, _ = precision_recall_curve(y_test, scores)
         pr_auc_val = average_precision_score(y_test, scores)
-        ax.plot(rec, prec, color=color, lw=2,
-                label=f"{name} (PR-AUC = {pr_auc_val:.3f})")
+        ax.plot(rec, prec, color=color, lw=2, label=f"{name} (PR-AUC = {pr_auc_val:.3f})")
 
     baseline = y_test.sum() / len(y_test)
     ax.axhline(y=baseline, color="k", linestyle="--", alpha=0.5, label=f"Baseline ({baseline:.3f})")
@@ -310,9 +307,15 @@ def plot_confusion_matrices(
         im = ax.imshow(matrix, cmap="Blues", aspect="auto")
         for i in range(2):
             for j in range(2):
-                ax.text(j, i, f"{matrix[i, j]:,}",
-                        ha="center", va="center", fontsize=14,
-                        color="white" if matrix[i, j] > matrix.max() / 2 else "black")
+                ax.text(
+                    j,
+                    i,
+                    f"{matrix[i, j]:,}",
+                    ha="center",
+                    va="center",
+                    fontsize=14,
+                    color="white" if matrix[i, j] > matrix.max() / 2 else "black",
+                )
 
         ax.set_xticks([0, 1])
         ax.set_xticklabels(["Predicted\nNormal", "Predicted\nAnomaly"])
@@ -355,13 +358,15 @@ def generate_comparison_table(
             f"{m['recall']} | {m['f1']} | {m['fpr']} | {m['fpr_at_90pct_recall']} |"
         )
 
-    lines.extend([
-        "",
-        "> ⚠️ = Supervised upper-bound benchmark (uses labels unavailable in production).",
-        "> All unsupervised models trained on benign traffic only.",
-        "> Threshold selected at target FPR ≤ 1%.",
-        "> PR-AUC is the lead metric for this imbalanced dataset.",
-    ])
+    lines.extend(
+        [
+            "",
+            "> ⚠️ = Supervised upper-bound benchmark (uses labels unavailable in production).",
+            "> All unsupervised models trained on benign traffic only.",
+            "> Threshold selected at target FPR ≤ 1%.",
+            "> PR-AUC is the lead metric for this imbalanced dataset.",
+        ]
+    )
 
     # Per-attack recall table
     lines.extend(["", "## Per-Attack-Type Recall", ""])
@@ -437,7 +442,9 @@ def run_evaluation(
         if (model_path / "model.joblib").exists():
             models[model_name] = cls.load(model_path)
         else:
-            logger.warning("model_artifact_missing_skipping", model=model_name, path=str(model_path))
+            logger.warning(
+                "model_artifact_missing_skipping", model=model_name, path=str(model_path)
+            )
 
     # Evaluate each model
     all_metrics: dict[str, dict[str, object]] = {}

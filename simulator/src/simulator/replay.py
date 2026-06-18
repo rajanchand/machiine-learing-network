@@ -156,7 +156,9 @@ def row_to_payload(row: pd.Series) -> dict[str, Any]:
         "dst_port": int(row.get("dst_port", 80)),
         "protocol": int(row.get("protocol", 6)),
         "features": features,
-        "label": str(row.get("label", "UNKNOWN")) if pd.notna(row.get("label")) else None,
+        "label": str(row.get("label", "UNKNOWN"))
+        if pd.notna(row.get("label"))
+        else None,
     }
 
 
@@ -183,9 +185,25 @@ async def replay_flows(
     )
 
     # Pre-slice scenario datasets to speed up simulation injection
-    portscan_rows = df[df["label"].str.upper() == "PORTSCAN"] if "label" in df.columns else pd.DataFrame()
-    ddos_rows = df[df["label"].str.upper() == "DDOS"] if "label" in df.columns else pd.DataFrame()
-    bruteforce_rows = df[df["label"].str.upper().isin(["FTP-PATATOR", "SSH-PATATOR", "WEB ATTACK - BRUTE FORCE"])] if "label" in df.columns else pd.DataFrame()
+    portscan_rows = (
+        df[df["label"].str.upper() == "PORTSCAN"]
+        if "label" in df.columns
+        else pd.DataFrame()
+    )
+    ddos_rows = (
+        df[df["label"].str.upper() == "DDOS"]
+        if "label" in df.columns
+        else pd.DataFrame()
+    )
+    bruteforce_rows = (
+        df[
+            df["label"]
+            .str.upper()
+            .isin(["FTP-PATATOR", "SSH-PATATOR", "WEB ATTACK - BRUTE FORCE"])
+        ]
+        if "label" in df.columns
+        else pd.DataFrame()
+    )
 
     sent = 0
     errors = 0
@@ -265,9 +283,15 @@ async def replay_flows(
 
                 # 3. If scenario burst reaches limit, reset scenario on backend
                 if active_scenario and scenario_count >= 20:
-                    logger.info("scenario_burst_complete", scenario=active_scenario, count=scenario_count)
+                    logger.info(
+                        "scenario_burst_complete",
+                        scenario=active_scenario,
+                        count=scenario_count,
+                    )
                     try:
-                        await client.post(f"{api_url}/simulate", json={"scenario": None})
+                        await client.post(
+                            f"{api_url}/simulate", json={"scenario": None}
+                        )
                     except Exception as e:
                         logger.warning("failed_to_reset_scenario", error=str(e))
                     scenario_count = 0

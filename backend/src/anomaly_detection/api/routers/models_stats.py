@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -38,10 +38,9 @@ def _get_session(request: Request) -> AsyncSession:
 async def list_models(request: Request) -> list[ModelResponse]:
     """List all registered models with their metrics."""
     from anomaly_detection.db.models import MLModel
+
     async with _get_session(request) as session:
-        result = await session.execute(
-            select(MLModel).order_by(desc(MLModel.trained_at))
-        )
+        result = await session.execute(select(MLModel).order_by(desc(MLModel.trained_at)))
         models = result.scalars().all()
         return [ModelResponse.model_validate(m) for m in models]
 
@@ -55,6 +54,7 @@ async def update_threshold(
     """Update the scoring threshold for a model."""
     inference_svc = request.app.state.inference_service
     from anomaly_detection.services.inference import InferenceService
+
     assert isinstance(inference_svc, InferenceService)
 
     if model_name not in inference_svc.available_models:
@@ -69,21 +69,19 @@ async def update_threshold(
     from sqlalchemy import update as sql_update
 
     from anomaly_detection.db.models import MLModel
+
     async with _get_session(request) as session:
         await session.execute(
-            sql_update(MLModel)
-            .where(MLModel.name == model_name)
-            .values(threshold=update.threshold)
+            sql_update(MLModel).where(MLModel.name == model_name).values(threshold=update.threshold)
         )
         await session.commit()
 
     return {"model_name": model_name, "threshold": update.threshold}
 
 
-
-
 class ActiveModelUpdate(BaseModel):
     """Request schema for setting active model."""
+
     name: str
 
 
@@ -95,6 +93,7 @@ async def set_active_model(
     """Set the active ML model."""
     inference_svc = request.app.state.inference_service
     from anomaly_detection.services.inference import InferenceService
+
     assert isinstance(inference_svc, InferenceService)
 
     if update.name not in inference_svc.available_models:
@@ -109,11 +108,10 @@ async def set_active_model(
     from sqlalchemy import update as sql_update
 
     from anomaly_detection.db.models import MLModel
+
     async with _get_session(request) as session:
         # Deactivate all models
-        await session.execute(
-            sql_update(MLModel).values(is_active=False)
-        )
+        await session.execute(sql_update(MLModel).values(is_active=False))
         # Activate the chosen model
         await session.execute(
             sql_update(MLModel).where(MLModel.name == update.name).values(is_active=True)
@@ -166,10 +164,7 @@ async def get_kpis(request: Request) -> KPIResponse:
             .order_by(desc("cnt"))
             .limit(5)
         )
-        top_talkers = [
-            TopTalker(ip=row[0], flow_count=row[1])
-            for row in top_talkers_result.all()
-        ]
+        top_talkers = [TopTalker(ip=row[0], flow_count=row[1]) for row in top_talkers_result.all()]
 
         return KPIResponse(
             total_flows=total_flows,
@@ -185,6 +180,7 @@ async def get_timeline(request: Request) -> TimelineResponse:
     """Get anomaly score timeline data for charts."""
     inference_svc = request.app.state.inference_service
     from anomaly_detection.services.inference import InferenceService
+
     assert isinstance(inference_svc, InferenceService)
 
     async with _get_session(request) as session:
@@ -195,9 +191,9 @@ async def get_timeline(request: Request) -> TimelineResponse:
                 func.avg(Prediction.score).label("avg_score"),
                 func.max(Prediction.score).label("max_score"),
                 func.count(Prediction.id).label("flow_count"),
-                func.sum(
-                    func.cast(Prediction.is_anomaly, type_=Prediction.score.type)
-                ).label("anomaly_count"),
+                func.sum(func.cast(Prediction.is_anomaly, type_=Prediction.score.type)).label(
+                    "anomaly_count"
+                ),
             )
             .group_by("bucket")
             .order_by(desc("bucket"))
@@ -241,17 +237,19 @@ async def get_model_comparison(request: Request) -> list[dict[str, Any]]:
     result = []
     for name, m in all_metrics.items():
         cm = m.get("confusion_matrix", {})
-        result.append({
-            "name": name,
-            "model_type": m.get("model_type", "unsupervised"),
-            "accuracy": m.get("accuracy", 0.0),
-            "precision": m.get("precision", 0.0),
-            "recall": m.get("recall", 0.0),
-            "f1": m.get("f1", 0.0),
-            "roc_auc": m.get("roc_auc", 0.0),
-            "pr_auc": m.get("pr_auc", 0.0),
-            "fpr": m.get("fpr", 0.0),
-            "confusion_matrix": cm,
-            "per_attack_recall": m.get("per_attack_recall", {}),
-        })
+        result.append(
+            {
+                "name": name,
+                "model_type": m.get("model_type", "unsupervised"),
+                "accuracy": m.get("accuracy", 0.0),
+                "precision": m.get("precision", 0.0),
+                "recall": m.get("recall", 0.0),
+                "f1": m.get("f1", 0.0),
+                "roc_auc": m.get("roc_auc", 0.0),
+                "pr_auc": m.get("pr_auc", 0.0),
+                "fpr": m.get("fpr", 0.0),
+                "confusion_matrix": cm,
+                "per_attack_recall": m.get("per_attack_recall", {}),
+            }
+        )
     return result

@@ -42,7 +42,7 @@ def _require_auth(request: Request) -> str:
     user = request.session.get("user")
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return cast(str, user)
+    return cast("str", user)
 
 
 @router.get("", response_model=list[AlertResponse])
@@ -61,6 +61,7 @@ async def list_alerts(
             query = query.where(Alert.status == AlertStatus(status))
         if severity:
             from anomaly_detection.db.models import AlertSeverity
+
             query = query.where(Alert.severity == AlertSeverity(severity))
         if attack_type:
             query = query.where(Alert.suspected_attack_type == attack_type)
@@ -72,8 +73,10 @@ async def list_alerts(
         if alerts:
             alert_ids = [a.id for a in alerts]
             feedbacks = (
-                await session.execute(select(Feedback).where(Feedback.alert_id.in_(alert_ids)))
-            ).scalars().all()
+                (await session.execute(select(Feedback).where(Feedback.alert_id.in_(alert_ids))))
+                .scalars()
+                .all()
+            )
             feedback_map = {f.alert_id: f.verdict for f in feedbacks}
 
         return [
@@ -97,19 +100,28 @@ async def export_feedback(request: Request) -> StreamingResponse:
 
     async with _get_session(request) as session:
         feedbacks = (
-            await session.execute(
-                select(Feedback).options(
-                    selectinload(Feedback.alert).selectinload(Alert.flow)
+            (
+                await session.execute(
+                    select(Feedback).options(selectinload(Feedback.alert).selectinload(Alert.flow))
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
     output = io.StringIO()
     writer = csv.writer(output)
 
     headers = [
-        "feedback_id", "alert_id", "flow_id", "verdict", "user", "created_at",
-        "original_label", "suspected_attack_type", "corrected_label",
+        "feedback_id",
+        "alert_id",
+        "flow_id",
+        "verdict",
+        "user",
+        "created_at",
+        "original_label",
+        "suspected_attack_type",
+        "corrected_label",
         *FEATURE_COLUMNS,
     ]
     writer.writerow(headers)
@@ -127,9 +139,15 @@ async def export_feedback(request: Request) -> StreamingResponse:
         )
 
         row = [
-            str(fb.id), str(fb.alert_id), str(flow.id), fb.verdict, fb.user,
+            str(fb.id),
+            str(fb.alert_id),
+            str(flow.id),
+            fb.verdict,
+            fb.user,
             fb.created_at.isoformat(),
-            flow.label or "UNKNOWN", alert.suspected_attack_type or "", corrected_label,
+            flow.label or "UNKNOWN",
+            alert.suspected_attack_type or "",
+            corrected_label,
             *[str(getattr(flow, col, 0.0)) for col in FEATURE_COLUMNS],
         ]
         writer.writerow(row)
@@ -235,11 +253,13 @@ async def submit_alert_feedback(
             feedback.user = username
             feedback.created_at = datetime.now(UTC)
         else:
-            session.add(Feedback(
-                alert_id=alert_uuid,
-                verdict=payload.verdict.value,
-                user=username,
-            ))
+            session.add(
+                Feedback(
+                    alert_id=alert_uuid,
+                    verdict=payload.verdict.value,
+                    user=username,
+                )
+            )
 
         await session.commit()
 

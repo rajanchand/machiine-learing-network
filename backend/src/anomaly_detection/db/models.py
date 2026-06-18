@@ -59,12 +59,8 @@ class Flow(Base):
 
     __tablename__ = "flows"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    ts: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 
     # Network identifiers
     src_ip: Mapped[str] = mapped_column(String(45), nullable=False)
@@ -136,9 +132,7 @@ class Prediction(Base):
 
     __tablename__ = "predictions"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     flow_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("flows.id", ondelete="CASCADE"), nullable=False
     )
@@ -160,9 +154,7 @@ class Alert(Base):
 
     __tablename__ = "alerts"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     flow_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("flows.id", ondelete="CASCADE"), nullable=False
     )
@@ -192,9 +184,7 @@ class MLModel(Base):
 
     __tablename__ = "ml_models"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     version: Mapped[str] = mapped_column(String(64), nullable=False)
     trained_at: Mapped[datetime] = mapped_column(
@@ -214,9 +204,7 @@ class User(Base):
 
     __tablename__ = "users"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     username: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -229,16 +217,16 @@ class Feedback(Base):
 
     __tablename__ = "feedback"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     alert_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("alerts.id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
     )
-    verdict: Mapped[str] = mapped_column(String(32), nullable=False)  # "true_positive" or "false_positive"
+    verdict: Mapped[str] = mapped_column(
+        String(32), nullable=False
+    )  # "true_positive" or "false_positive"
     user: Mapped[str] = mapped_column(String(128), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -253,9 +241,7 @@ class DriftReading(Base):
 
     __tablename__ = "drift_readings"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     ts: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
     )
@@ -263,4 +249,3 @@ class DriftReading(Base):
     feature_psis: Mapped[dict[str, float]] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"), nullable=False
     )
-

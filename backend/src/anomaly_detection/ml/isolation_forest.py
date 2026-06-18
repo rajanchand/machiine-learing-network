@@ -72,11 +72,14 @@ class IsolationForestDetector(AnomalyDetector):
         """Save model to disk."""
         path.mkdir(parents=True, exist_ok=True)
         joblib.dump(self._model, path / "model.joblib")
-        self.save_metadata(path, extra={
-            "n_estimators": self._n_estimators,
-            "contamination": self._contamination,
-            "random_state": self._random_state,
-        })
+        self.save_metadata(
+            path,
+            extra={
+                "n_estimators": self._n_estimators,
+                "contamination": self._contamination,
+                "random_state": self._random_state,
+            },
+        )
         logger.info("model_saved", model=self.name, path=str(path))
 
     @classmethod
