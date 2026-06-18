@@ -1,14 +1,18 @@
 import pandas as pd
 import numpy as np
-import pytest
 
 from anomaly_detection.pipeline.ingest import clean_dataframe, infer_day_from_filename
 from anomaly_detection.pipeline.features import extract_features
 
+
 def test_infer_day_from_filename():
     assert infer_day_from_filename("Monday-WorkingHours.pcap_ISCX.csv") == "2017-07-03"
-    assert infer_day_from_filename("Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv") == "2017-07-07"
+    assert (
+        infer_day_from_filename("Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv")
+        == "2017-07-07"
+    )
     assert infer_day_from_filename("Unknown.csv") == "2017-07-03"
+
 
 def test_clean_dataframe():
     # Construct a raw dataframe containing typical CICIDS anomalies
@@ -26,10 +30,10 @@ def test_clean_dataframe():
     }
     df = pd.DataFrame(raw_data)
     df.columns = df.columns.str.strip()
-    
+
     # Run cleaning
     cleaned = clean_dataframe(df)
-    
+
     # Row 1: valid numeric, valid float -> kept
     # Row 2: contains 'Infinity' -> replaced with NaN -> dropped
     # Row 3: contains 'NaN' -> dropped
@@ -38,11 +42,12 @@ def test_clean_dataframe():
     # Let's check: only row 1 and row 4 should remain after dropping NaN/Inf
     assert len(cleaned) == 2
     assert "label" in cleaned.columns
-    assert "Flow Duration" in cleaned.columns # Column names stripped
-    
+    assert "Flow Duration" in cleaned.columns  # Column names stripped
+
     # Ensure types are correct
     assert cleaned["Flow Bytes/s"].dtype == np.float64
     assert cleaned["Flow Packets/s"].dtype == np.float64
+
 
 def test_extract_features():
     # Test feature selection and documentation
@@ -94,7 +99,7 @@ def test_extract_features():
     }
     df = pd.DataFrame(raw_data)
     features = extract_features(df)
-    
+
     # Feature columns should match target format
     assert "flow_duration" in features.columns
     assert "total_fwd_packets" in features.columns

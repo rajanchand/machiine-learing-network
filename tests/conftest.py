@@ -142,6 +142,10 @@ async def app_client(session_factory) -> AsyncGenerator[AsyncClient, None]:
         inference_service._active_model = "isolation_forest"
 
     app.state.inference_service = inference_service
+    from anomaly_detection.constants import FEATURE_COLUMNS
+    app.state.feature_stats = {
+        col: {"mean": 0.0, "std": 1.0} for col in FEATURE_COLUMNS
+    }
     app.state.settings = settings
     app.state.metrics_inference_count = 0
     app.state.metrics_inference_sum = 0.0

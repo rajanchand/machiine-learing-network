@@ -7,7 +7,7 @@ import json
 import time
 from typing import TYPE_CHECKING, cast
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import desc, select
 
@@ -157,6 +157,7 @@ async def batch_inference(
 async def stream_inference(
     request: Request,
     flow_create: FlowCreate,
+    background_tasks: BackgroundTasks,
 ) -> PredictionResponse:
     inference_svc = _get_inference_service(request)
 
@@ -217,6 +218,21 @@ async def stream_inference(
             severity_str = severity.value
 
         await session.commit()
+
+        # Fire incident webhook notifier in the background (non-blocking)
+        if is_anomaly and alert_id and severity_str:
+            notifier = getattr(request.app.state, "notification_service", None)
+            if notifier:
+                background_tasks.add_task(
+                    notifier.notify_alert,
+                    alert_id,
+                    severity_str,
+                    flow_create.label,
+                    score,
+                    f"{flow.src_ip}:{flow.src_port}",
+                    f"{flow.dst_ip}:{flow.dst_port}",
+                    flow.protocol,
+                )
 
     await _broadcast_event(
         StreamEvent(

@@ -215,10 +215,16 @@ export function ModelComparison() {
   const [data, setData] = useState<ModelMetrics[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState("autoencoder");
 
   useEffect(() => {
     getComparison()
-      .then(setData)
+      .then((res) => {
+        setData(res);
+        if (res.length > 0) {
+          setSelectedModel(res[0].name);
+        }
+      })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -259,104 +265,107 @@ export function ModelComparison() {
   ).sort();
 
   return (
-    <div className="main-content">
-      {/* Section 1 — Summary Table */}
-      <section className="card">
-        <h2 className="section-title">Performance Summary</h2>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ borderBottom: "2px solid var(--border)" }}>
-                <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600 }}>Model</th>
-                <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600 }}>Type</th>
-                {METRICS.map((m) => (
-                  <th
-                    key={m.key}
-                    style={{ textAlign: "center", padding: "8px 12px", fontWeight: 600 }}
-                  >
-                    {m.label}
-                  </th>
-                ))}
-                <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 600 }}>FPR</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((row) => (
-                <tr
-                  key={row.name}
-                  style={{ borderBottom: "1px solid var(--border)" }}
-                >
-                  <td style={{ padding: "8px 12px", fontWeight: 500 }}>
-                    <span
-                      style={{
-                        display: "inline-block",
-                        width: 10,
-                        height: 10,
-                        borderRadius: "50%",
-                        background: MODEL_COLORS[row.name] ?? "#94a3b8",
-                        marginRight: 8,
-                      }}
-                    />
-                    {DISPLAY_NAMES[row.name] ?? row.name}
-                  </td>
-                  <td style={{ padding: "8px 12px", color: "var(--text-2)", fontSize: 12 }}>
-                    {row.model_type}
-                  </td>
-                  {METRICS.map((m) => (
-                    <td key={m.key} style={{ padding: "8px 12px", textAlign: "center" }}>
-                      <MetricBadge
-                        value={(row as unknown as Record<string, number>)[m.key] ?? 0}
-                        best={bests[m.key]}
-                      />
-                    </td>
+    <div className="page-container">
+      {/* Row 1: Performance Summary Table + Metric Comparison Chart */}
+      <div className="grid-2">
+        <section className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          <div>
+            <h2 className="section-title">Performance Summary</h2>
+            <div style={{ overflowX: "auto", marginTop: 12 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid var(--border)" }}>
+                    <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600 }}>Model</th>
+                    <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600 }}>Type</th>
+                    {METRICS.map((m) => (
+                      <th
+                        key={m.key}
+                        style={{ textAlign: "center", padding: "8px 12px", fontWeight: 600 }}
+                      >
+                        {m.label}
+                      </th>
+                    ))}
+                    <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 600 }}>FPR</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((row) => (
+                    <tr
+                      key={row.name}
+                      style={{ borderBottom: "1px solid var(--border)" }}
+                    >
+                      <td style={{ padding: "8px 12px", fontWeight: 500 }}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: 10,
+                            height: 10,
+                            borderRadius: "50%",
+                            background: MODEL_COLORS[row.name] ?? "#94a3b8",
+                            marginRight: 8,
+                          }}
+                        />
+                        {DISPLAY_NAMES[row.name] ?? row.name}
+                      </td>
+                      <td style={{ padding: "8px 12px", color: "var(--text-2)", fontSize: 12 }}>
+                        {row.model_type}
+                      </td>
+                      {METRICS.map((m) => (
+                        <td key={m.key} style={{ padding: "8px 12px", textAlign: "center" }}>
+                          <MetricBadge
+                            value={(row as unknown as Record<string, number>)[m.key] ?? 0}
+                            best={bests[m.key]}
+                          />
+                        </td>
+                      ))}
+                      <td style={{ padding: "8px 12px", textAlign: "center", fontSize: 13, color: "var(--text-2)" }}>
+                        {pct(row.fpr)}
+                      </td>
+                    </tr>
                   ))}
-                  <td style={{ padding: "8px 12px", textAlign: "center", fontSize: 13, color: "var(--text-2)" }}>
-                    {pct(row.fpr)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p style={{ marginTop: 10, fontSize: 12, color: "var(--text-2)" }}>
-          Green cells = best value in that column. Supervised models (Random Forest, XGBoost,
-          LightGBM) have access to labels during training; unsupervised models do not.
-        </p>
-      </section>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p style={{ marginTop: 16, fontSize: 12, color: "var(--text-2)" }}>
+            * Green highlights show the best performance in each category. Supervised models are trained with full ground-truth labels; unsupervised models learn purely from benign behaviors.
+          </p>
+        </section>
 
-      {/* Section 2 — Grouped Bar Chart */}
-      <section className="card">
-        <h2 className="section-title">Metric Comparison Chart</h2>
-        <ResponsiveContainer width="100%" height={340}>
-          <BarChart data={barData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="metric" tick={{ fontSize: 13 }} />
-            <YAxis domain={[0, 1]} tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} tick={{ fontSize: 12 }} />
-            <Tooltip formatter={(v) => pct(v as number)} />
-            <Legend />
-            {data.map((d) => (
-              <Bar
-                key={d.name}
-                dataKey={DISPLAY_NAMES[d.name] ?? d.name}
-                fill={MODEL_COLORS[d.name] ?? "#94a3b8"}
-                radius={[3, 3, 0, 0]}
-              >
-                {barData.map((_, i) => (
-                  <Cell key={i} fill={MODEL_COLORS[d.name] ?? "#94a3b8"} />
+        <section className="card">
+          <h2 className="section-title">Metric Comparison Chart</h2>
+          <div style={{ height: 340, marginTop: 12 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={barData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="metric" tick={{ fontSize: 12 }} />
+                <YAxis domain={[0, 1]} tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v) => pct(v as number)} />
+                <Legend />
+                {data.map((d) => (
+                  <Bar
+                    key={d.name}
+                    dataKey={DISPLAY_NAMES[d.name] ?? d.name}
+                    fill={MODEL_COLORS[d.name] ?? "#94a3b8"}
+                    radius={[3, 3, 0, 0]}
+                  >
+                    {barData.map((_, i) => (
+                      <Cell key={i} fill={MODEL_COLORS[d.name] ?? "#94a3b8"} />
+                    ))}
+                  </Bar>
                 ))}
-              </Bar>
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      </section>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      </div>
 
-      {/* Section 3 — Per-Attack-Type Recall */}
+      {/* Row 2: Per-Attack-Type Recall heatmap */}
       {attackTypes.length > 0 && (
         <section className="card">
           <h2 className="section-title">Per-Attack-Type Recall</h2>
           <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 16 }}>
-            Recall (detection rate) for each attack type. Higher = better. Shows which models
-            detect specific attack categories most reliably.
+            Detection rate (recall percentage) for individual cyber threat scenarios. Higher is better. Highlights model specialization per threat vector.
           </p>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -418,17 +427,29 @@ export function ModelComparison() {
         </section>
       )}
 
-      {/* Section 4 — Strengths and Limitations */}
+      {/* Row 3: Strengths & Limitations with tabbed selectors */}
       <section className="card">
         <h2 className="section-title">Strengths &amp; Limitations</h2>
         <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 16 }}>
-          A qualitative analysis of each model's design trade-offs for network anomaly detection.
+          Qualitative design trade-offs and operating characteristics for each model architecture. Select a model tab below to toggle details.
         </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="tab-bar" style={{ display: "flex", gap: 8, borderBottom: "1px solid var(--border)", marginBottom: 20 }}>
           {data.map((d) => (
-            <StrengthCard key={d.name} name={d.name} />
+            <button
+              key={d.name}
+              className={`tab ${selectedModel === d.name ? "active" : ""}`}
+              onClick={() => setSelectedModel(d.name)}
+              type="button"
+            >
+              {DISPLAY_NAMES[d.name] ?? d.name}
+            </button>
           ))}
         </div>
+        {selectedModel && (
+          <div style={{ animation: "fade-in 0.2s ease-out" }}>
+            <StrengthCard name={selectedModel} />
+          </div>
+        )}
       </section>
     </div>
   );

@@ -1,4 +1,4 @@
-import type { AlertItem, DriftData, KPI, ModelInfo, ModelMetrics, TimelinePoint } from "./types";
+import type { AlertDetailResponse, AlertItem, DriftData, KPI, ModelInfo, ModelMetrics, TimelinePoint } from "./types";
 
 const BASE = "/api/v1";
 
@@ -54,6 +54,9 @@ export const setThreshold = (modelName: string, threshold: number) =>
   });
 
 // Alerts
+export const getAlertDetail = (alertId: string) =>
+  request<AlertDetailResponse>(`${BASE}/alerts/${alertId}`);
+
 export const submitFeedback = (alertId: string, verdict: "true_positive" | "false_positive") =>
   request<{ status: string; verdict: string }>(`${BASE}/alerts/${alertId}/feedback`, {
     method: "POST",

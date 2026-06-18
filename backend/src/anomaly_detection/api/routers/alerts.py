@@ -17,7 +17,13 @@ from sqlalchemy.orm import selectinload
 
 from anomaly_detection.constants import FEATURE_COLUMNS
 from anomaly_detection.db.models import Alert, AlertStatus, Feedback, Flow
-from anomaly_detection.schemas.common import AlertDetailResponse, AlertResponse, AlertStatusUpdate
+from anomaly_detection.schemas.common import (
+    AlertDetailResponse,
+    AlertResponse,
+    AlertStatusUpdate,
+    PredictionResponse,
+)
+from anomaly_detection.schemas.flows import FlowDetailResponse
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -181,6 +187,39 @@ async def get_alert_detail(request: Request, alert_id: str) -> AlertDetailRespon
             await session.execute(select(Feedback).where(Feedback.alert_id == alert_uuid))
         ).scalar_one_or_none()
 
+        flow_detail = None
+        if alert.flow:
+            flow_detail = FlowDetailResponse.model_validate(alert.flow)
+
+        predictions_list = []
+        if alert.flow and alert.flow.predictions:
+            predictions_list = [
+                PredictionResponse.model_validate(p) for p in alert.flow.predictions
+            ]
+
+        # Calculate explainability (top feature contributions based on Z-score deviation from benign baseline)
+        explainability: dict[str, float] = {}
+        if alert.flow:
+            feature_stats = getattr(request.app.state, "feature_stats", {})
+            contributions = []
+            for col in FEATURE_COLUMNS:
+                if hasattr(alert.flow, col) and col in feature_stats:
+                    val = getattr(alert.flow, col)
+                    mean = feature_stats[col]["mean"]
+                    std = feature_stats[col]["std"]
+                    z_score = abs(float(val) - mean) / std
+                    contributions.append((col, z_score))
+
+            if contributions:
+                # Sort by Z-score descending and take top 5
+                contributions.sort(key=lambda x: x[1], reverse=True)
+                top_contributors = contributions[:5]
+                total_z = sum(c[1] for c in top_contributors)
+                if total_z > 0:
+                    explainability = {c[0]: float(c[1] / total_z) for c in top_contributors}
+                else:
+                    explainability = {c[0]: 0.2 for c in top_contributors}
+
         return AlertDetailResponse(
             id=alert.id,
             flow_id=alert.flow_id,
@@ -189,6 +228,9 @@ async def get_alert_detail(request: Request, alert_id: str) -> AlertDetailRespon
             status=alert.status.value,
             created_at=alert.created_at,
             feedback_verdict=feedback.verdict if feedback else None,
+            flow=flow_detail,
+            predictions=predictions_list,
+            explainability=explainability if explainability else None,
         )
 
 

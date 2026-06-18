@@ -49,10 +49,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     inference_service.load_models()
 
+    from anomaly_detection.services.notifications import NotificationService
+    notification_service = NotificationService(settings)
+
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = session_factory
     app.state.inference_service = inference_service
+    app.state.notification_service = notification_service
 
     active_model_from_db: str | None = None
 
@@ -108,19 +112,31 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.info("loading_training_baseline", path=str(train_parquet))
             train_df = pd.read_parquet(train_parquet)
             reference_quantiles: dict[str, list[float]] = {}
+            feature_stats: dict[str, dict[str, float]] = {}
             for col in FEATURE_COLUMNS:
                 if col in train_df.columns:
                     series = train_df[col].dropna()
                     deciles = np.percentile(series, [10, 20, 30, 40, 50, 60, 70, 80, 90])
                     reference_quantiles[col] = np.sort(np.unique(deciles)).tolist()
+                    feature_stats[col] = {
+                        "mean": float(series.mean()),
+                        "std": float(series.std()) if float(series.std()) > 0 else 1.0,
+                    }
             app.state.reference_quantiles = reference_quantiles
-            logger.info("training_baseline_loaded", feature_count=len(reference_quantiles))
+            app.state.feature_stats = feature_stats
+            logger.info(
+                "training_baseline_loaded",
+                feature_count=len(reference_quantiles),
+                stats_count=len(feature_stats),
+            )
         except Exception as exc:
             logger.error("training_baseline_load_failed", error=str(exc))
             app.state.reference_quantiles = {}
+            app.state.feature_stats = {}
     else:
         logger.warning("train_parquet_not_found", path=str(train_parquet))
         app.state.reference_quantiles = {}
+        app.state.feature_stats = {}
 
     app.state.metrics_inference_count = 0
     app.state.metrics_inference_sum = 0.0

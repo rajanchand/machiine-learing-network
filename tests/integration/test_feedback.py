@@ -4,7 +4,13 @@ import pytest
 from datetime import datetime
 import uuid
 from sqlalchemy import select
-from anomaly_detection.db.models import Alert, AlertSeverity, AlertStatus, Flow, Feedback
+from anomaly_detection.db.models import (
+    Alert,
+    AlertSeverity,
+    AlertStatus,
+    Flow,
+    Feedback,
+)
 
 
 @pytest.mark.anyio
@@ -41,8 +47,7 @@ async def test_feedback_loop_and_csv_export(app_client, session_factory):
 
     # 2. Submit feedback verdict: true_positive
     res_feedback1 = await app_client.post(
-        f"/api/v1/alerts/{alert_uuid}/feedback",
-        json={"verdict": "true_positive"}
+        f"/api/v1/alerts/{alert_uuid}/feedback", json={"verdict": "true_positive"}
     )
     assert res_feedback1.status_code == 200
     assert res_feedback1.json()["status"] == "feedback_submitted"
@@ -60,8 +65,7 @@ async def test_feedback_loop_and_csv_export(app_client, session_factory):
 
     # 3. Update feedback verdict: false_positive
     res_feedback2 = await app_client.post(
-        f"/api/v1/alerts/{alert_uuid}/feedback",
-        json={"verdict": "false_positive"}
+        f"/api/v1/alerts/{alert_uuid}/feedback", json={"verdict": "false_positive"}
     )
     assert res_feedback2.status_code == 200
     assert res_feedback2.json()["verdict"] == "false_positive"
@@ -78,13 +82,16 @@ async def test_feedback_loop_and_csv_export(app_client, session_factory):
     res_export = await app_client.get("/api/v1/alerts/feedback/export")
     assert res_export.status_code == 200
     assert res_export.headers["Content-Type"].startswith("text/csv")
-    assert "attachment; filename=analyst_feedback_dataset.csv" in res_export.headers["Content-Disposition"]
+    assert (
+        "attachment; filename=analyst_feedback_dataset.csv"
+        in res_export.headers["Content-Disposition"]
+    )
 
     csv_content = res_export.text
     # Verify CSV has headers and correct content rows
     lines = csv_content.splitlines()
     assert len(lines) >= 2
-    
+
     headers = lines[0].split(",")
     assert "feedback_id" in headers
     assert "alert_id" in headers

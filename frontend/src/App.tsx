@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getAlerts, getDrift, getKPIs, getModels, getTimeline, setActiveModel, setThreshold } from "./api";
 import { AlertTable } from "./components/AlertTable";
 import { FlowFeed } from "./components/FlowFeed";
-import { Header, type Page } from "./components/Header";
+import { Sidebar, type Page } from "./components/Sidebar";
 import { KPIStrip } from "./components/KPIStrip";
 import { LoginPage } from "./components/LoginPage";
 import { StatusBar } from "./components/StatusBar";
@@ -48,15 +48,16 @@ export default function App() {
 
   const { events, connected } = useSSE("/api/v1/flows/feed", handleIncomingEvent);
 
-  const { data: kpi, loading: kpiLoading } = usePolling(getKPIs, 5000, !!user);
-  const { data: timeline, loading: timelineLoading } = usePolling(getTimeline, 5000, !!user);
-  const { data: drift, loading: driftLoading } = usePolling(getDrift, 10000, !!user);
-
-  usePolling(
+  const { data: kpi, error: kpiError, loading: kpiLoading } = usePolling(getKPIs, 5000, !!user);
+  const { data: timeline, error: timelineError, loading: timelineLoading } = usePolling(getTimeline, 5000, !!user);
+  const { data: drift, error: driftError, loading: driftLoading } = usePolling(getDrift, 10000, !!user);
+  const { error: alertsError } = usePolling(
     useCallback(() => getAlerts(100).then((data) => { setAlerts(data); return data; }), []),
     5000,
     !!user,
   );
+
+  const apiError = kpiError || timelineError || driftError || alertsError;
 
   usePolling(
     useCallback(async () => {
@@ -118,8 +119,8 @@ export default function App() {
   }
 
   return (
-    <div className="app">
-      <Header
+    <div className="app-container">
+      <Sidebar
         user={user}
         models={allModels}
         activeModel={activeModel}
@@ -131,41 +132,49 @@ export default function App() {
         onPageChange={setPage}
       />
 
-      {page === "monitor" && (
-        <>
-          <StatusBar
-            connected={connected}
-            activeModel={activeModel}
-            flowsPerSec={flowsPerSec}
-            alertRate={alertRate}
-            driftStatus={drift?.status ?? null}
-          />
+      <div className="content-container">
+        {apiError && (
+          <div className="alert-banner error" style={{ margin: "20px 24px 0", borderRadius: 8 }}>
+            <strong>⚠️ Service Interruption:</strong> {apiError}. Please ensure the backend server is running.
+          </div>
+        )}
 
-          <main className="main-content">
-            <KPIStrip kpi={kpi} loading={kpiLoading} />
-
-            <TimelineChart
-              data={timeline ?? []}
-              threshold={threshold}
-              loading={timelineLoading}
+        {page === "monitor" && (
+          <>
+            <StatusBar
+              connected={connected}
+              activeModel={activeModel}
+              flowsPerSec={flowsPerSec}
+              alertRate={alertRate}
+              driftStatus={drift?.status ?? null}
             />
 
-            <FlowFeed events={events} />
+            <main className="main-content">
+              <KPIStrip kpi={kpi} loading={kpiLoading} />
 
-            <SystemOps drift={drift} driftLoading={driftLoading} />
+              <TimelineChart
+                data={timeline ?? []}
+                threshold={threshold}
+                loading={timelineLoading}
+              />
 
-            <AlertTable
-              alerts={alerts}
-              loading={false}
-              onFeedbackSubmitted={handleFeedbackSubmitted}
-            />
-          </main>
-        </>
-      )}
+              <FlowFeed events={events} />
 
-      {page === "comparison" && <ModelComparison />}
+              <SystemOps drift={drift} driftLoading={driftLoading} />
 
-      {page === "dataset" && <DatasetOverview />}
+              <AlertTable
+                alerts={alerts}
+                loading={false}
+                onFeedbackSubmitted={handleFeedbackSubmitted}
+              />
+            </main>
+          </>
+        )}
+
+        {page === "comparison" && <ModelComparison />}
+
+        {page === "dataset" && <DatasetOverview />}
+      </div>
     </div>
   );
 }

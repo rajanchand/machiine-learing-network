@@ -21,7 +21,9 @@ async def test_simulation_scenario_lifecycle(app_client):
     assert res_get_ddos.json()["active_scenario"] == "ddos"
 
     # 3. Set active scenario to an invalid value -> 400
-    res_set_invalid = await app_client.post("/simulate", json={"scenario": "invalid_hack"})
+    res_set_invalid = await app_client.post(
+        "/simulate", json={"scenario": "invalid_hack"}
+    )
     assert res_set_invalid.status_code == 400
 
     # 4. Clear/Stop simulation scenario (set to None or empty string)

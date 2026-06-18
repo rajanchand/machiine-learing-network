@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     )
     simulator_api_key: str = "simulator-secret"
     environment: Literal["development", "staging", "production"] = "development"
+    alert_webhook_url: str | None = None
 
     # Rate limiting
     login_rate_limit: int = 10  # max login attempts per minute per IP

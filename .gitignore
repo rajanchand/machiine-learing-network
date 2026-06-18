@@ -56,4 +56,7 @@ htmlcov/
 node_modules/
 frontend/dist/
 anomaly_detection.db
+*.db.bak
+backend/data/
+backend/uv.lock
 simulator/.env

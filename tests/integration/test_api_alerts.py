@@ -6,12 +6,15 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
 from anomaly_detection.db.models import Flow, Alert, AlertSeverity, AlertStatus
 
+
 @pytest.mark.anyio
-async def test_alerts_lifecycle(app_client: AsyncClient, session_factory: async_sessionmaker[AsyncSession]):
+async def test_alerts_lifecycle(
+    app_client: AsyncClient, session_factory: async_sessionmaker[AsyncSession]
+):
     # Setup: Insert a dummy flow and alert directly in the database
     flow_id = uuid.uuid4()
     alert_id = uuid.uuid4()
-    
+
     async with session_factory() as session:
         flow = Flow(
             id=flow_id,
@@ -39,11 +42,11 @@ async def test_alerts_lifecycle(app_client: AsyncClient, session_factory: async_
     assert response.status_code == 200
     data = response.json()
     assert len(data) >= 1
-    
+
     # Check filters
     response_filt = await app_client.get("/api/v1/alerts?status=open")
     assert response_filt.status_code == 200
-    
+
     # 2. Get alert details
     response_det = await app_client.get(f"/api/v1/alerts/{alert_id}")
     assert response_det.status_code == 200
@@ -52,16 +55,15 @@ async def test_alerts_lifecycle(app_client: AsyncClient, session_factory: async_
     assert detail["flow_id"] == str(flow_id)
     assert detail["severity"] == "medium"
     assert detail["status"] == "open"
-    
+
     # 3. Update alert status
     response_patch = await app_client.patch(
-        f"/api/v1/alerts/{alert_id}/status",
-        json={"status": "acknowledged"}
+        f"/api/v1/alerts/{alert_id}/status", json={"status": "acknowledged"}
     )
     assert response_patch.status_code == 200
     patched_data = response_patch.json()
     assert patched_data["status"] == "acknowledged"
-    
+
     # Verify in DB
     async with session_factory() as session:
         db_alert = await session.get(Alert, alert_id)

@@ -12,6 +12,8 @@ const TABS: { label: string; value: StatusFilter }[] = [
   { label: "Resolved", value: "resolved" },
 ];
 
+type SeverityFilter = "all" | "low" | "medium" | "high" | "critical";
+
 interface Props {
   alerts: AlertItem[];
   loading: boolean;
@@ -20,9 +22,12 @@ interface Props {
 
 export function AlertTable({ alerts, loading, onFeedbackSubmitted }: Props) {
   const [filter, setFilter] = useState<StatusFilter>("all");
+  const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
   const [selected, setSelected] = useState<AlertItem | null>(null);
 
-  const visible = filter === "all" ? alerts : alerts.filter((a) => a.status === filter);
+  const visible = alerts
+    .filter((a) => filter === "all" || a.status === filter)
+    .filter((a) => severityFilter === "all" || a.severity.toLowerCase() === severityFilter);
 
   return (
     <div className="card span-full">
@@ -45,6 +50,23 @@ export function AlertTable({ alerts, loading, onFeedbackSubmitted }: Props) {
       </div>
 
       <div className="alert-table-toolbar">
+        <div style={{ display: "flex", alignItems: "center", marginRight: "auto", paddingLeft: 4 }}>
+          <label htmlFor="severity-filter" style={{ fontSize: 12, color: "var(--text-muted)", marginRight: 8 }}>
+            Severity:
+          </label>
+          <select
+            id="severity-filter"
+            className="header-select"
+            value={severityFilter}
+            onChange={(e) => setSeverityFilter(e.target.value as SeverityFilter)}
+          >
+            <option value="all">All Severities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
         <button className="btn-sm" onClick={downloadFeedbackCSV} type="button">
           Export feedback CSV
         </button>

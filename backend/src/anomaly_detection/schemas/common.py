@@ -53,6 +53,7 @@ class AlertDetailResponse(AlertResponse):
 
     flow: FlowDetailResponse | None = None
     predictions: list[PredictionResponse] = Field(default_factory=list)
+    explainability: dict[str, float] | None = None
 
 
 class AlertStatusUpdate(BaseModel):

@@ -98,11 +98,11 @@ const STATS = [
 
 export function DatasetOverview() {
   return (
-    <div className="main-content">
+    <div className="page-container">
       {/* Topic summary */}
       <section className="card">
         <h2 className="section-title">ML-Based Network Anomaly Detection</h2>
-        <p style={{ fontSize: 14, lineHeight: 1.75, color: "var(--text)" }}>
+        <p style={{ fontSize: 14, lineHeight: 1.75, color: "var(--text)", marginTop: 10 }}>
           This project applies machine learning to detect anomalous network behaviour using the{" "}
           <strong>CICIDS2017 dataset</strong> — a widely used benchmark containing realistic
           network traffic captures with 14 attack categories alongside benign traffic. Each network
@@ -125,6 +125,7 @@ export function DatasetOverview() {
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
             gap: 12,
+            marginTop: 12,
           }}
         >
           {STATS.map((s) => (
@@ -137,7 +138,7 @@ export function DatasetOverview() {
                 padding: "14px 16px",
               }}
             >
-              <div style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 4 }}>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
                 {s.label}
               </div>
               <div style={{ fontSize: 16, fontWeight: 600 }}>{s.value}</div>
@@ -147,63 +148,69 @@ export function DatasetOverview() {
       </section>
 
       {/* Charts row */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="grid-2">
         {/* Class distribution pie */}
         <section className="card">
           <h2 className="section-title">Class Distribution</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie
-                data={CLASS_DISTRIBUTION}
-                cx="50%"
-                cy="50%"
-                outerRadius={80}
-                dataKey="value"
-                label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(1)}%`}
-                labelLine={true}
-              >
-                {CLASS_DISTRIBUTION.map((entry, i) => (
-                  <Cell key={i} fill={entry.fill} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(v) => (v as number).toLocaleString()} />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-          <p style={{ fontSize: 12, color: "var(--text-2)", marginTop: 8 }}>
-            The dataset is imbalanced: 79.6% benign, 20.4% attacks. All supervised models use
-            class-weight balancing to handle this.
-          </p>
+          <div style={{ height: 400, display: "flex", flexDirection: "column", justifyContent: "space-between", marginTop: 12 }}>
+            <div style={{ height: 320 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={CLASS_DISTRIBUTION}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={90}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(1)}%`}
+                    labelLine={true}
+                  >
+                    {CLASS_DISTRIBUTION.map((entry, i) => (
+                      <Cell key={i} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v) => (v as number).toLocaleString()} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8, textAlign: "center" }}>
+              The dataset is imbalanced: 79.6% benign, 20.4% attacks. All supervised models use
+              class-weight balancing to handle this.
+            </p>
+          </div>
         </section>
 
         {/* Attack breakdown bar */}
         <section className="card">
           <h2 className="section-title">Attack Type Breakdown</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart
-              data={ATTACK_TYPES}
-              layout="vertical"
-              margin={{ top: 0, right: 16, left: 120, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis type="number" tick={{ fontSize: 11 }} />
-              <YAxis
-                type="category"
-                dataKey="name"
-                tick={{ fontSize: 11 }}
-                width={120}
-              />
-              <Tooltip />
-              <Bar dataKey="count" fill="#ef4444" radius={[0, 3, 3, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div style={{ height: 400, marginTop: 12 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={ATTACK_TYPES}
+                layout="vertical"
+                margin={{ top: 0, right: 16, left: 140, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis type="number" tick={{ fontSize: 11 }} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tick={{ fontSize: 11 }}
+                  width={140}
+                />
+                <Tooltip formatter={(v) => (v as number).toLocaleString()} />
+                <Bar dataKey="count" fill="#ef4444" radius={[0, 3, 3, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </section>
       </div>
 
       {/* Feature list */}
       <section className="card">
         <h2 className="section-title">Feature Groups ({FEATURE_COUNT} features)</h2>
-        <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 16 }}>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16, marginTop: 4 }}>
           Features are extracted from raw network flows using CICFlowMeter and normalised with
           StandardScaler before model input.
         </p>
