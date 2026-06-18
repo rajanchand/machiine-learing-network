@@ -5,14 +5,13 @@ from __future__ import annotations
 import csv
 import io
 import random
-import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 
-from anomaly_detection.db.models import Packet, PacketCapture, CaptureStatus
+from anomaly_detection.db.models import CaptureStatus, Packet, PacketCapture
 from anomaly_detection.schemas.common import PacketCaptureResponse, PacketResponse
 
 router = APIRouter(prefix="/api/v1/packets", tags=["packets"])
@@ -47,7 +46,9 @@ async def start_capture(request: Request, body: dict | None = None) -> PacketCap
                 packet_size=random.randint(40, 1500),
                 ttl=random.choice([64, 128, 255]),
                 flags=random.choice(["SYN", "ACK", "SYN-ACK", "FIN", "RST", "PSH-ACK", ""]),
-                status=random.choices(["Normal", "Suspicious", "Malicious"], weights=[85, 10, 5])[0],
+                status=random.choices(["Normal", "Suspicious", "Malicious"], weights=[85, 10, 5])[
+                    0
+                ],
             )
             session.add(pkt)
 
@@ -79,7 +80,7 @@ async def stop_capture(request: Request, body: dict | None = None) -> dict:
             capture = result.scalar_one_or_none()
             if capture:
                 capture.status = CaptureStatus.COMPLETED
-                capture.stopped_at = datetime.now(timezone.utc)
+                capture.stopped_at = datetime.now(UTC)
                 await session.commit()
         else:
             # Stop all running captures
@@ -89,7 +90,7 @@ async def stop_capture(request: Request, body: dict | None = None) -> dict:
             captures = result.scalars().all()
             for c in captures:
                 c.status = CaptureStatus.COMPLETED
-                c.stopped_at = datetime.now(timezone.utc)
+                c.stopped_at = datetime.now(UTC)
             await session.commit()
 
     return {"message": "Capture stopped"}
@@ -166,15 +167,37 @@ async def export_packets_csv(request: Request) -> StreamingResponse:
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow([
-        "ID", "Timestamp", "Source IP", "Destination IP", "Protocol",
-        "Source Port", "Destination Port", "Packet Size", "TTL", "Flags", "Status"
-    ])
+    writer.writerow(
+        [
+            "ID",
+            "Timestamp",
+            "Source IP",
+            "Destination IP",
+            "Protocol",
+            "Source Port",
+            "Destination Port",
+            "Packet Size",
+            "TTL",
+            "Flags",
+            "Status",
+        ]
+    )
     for p in packets:
-        writer.writerow([
-            str(p.id), p.timestamp.isoformat(), p.src_ip, p.dst_ip, p.protocol,
-            p.src_port, p.dst_port, p.packet_size, p.ttl, p.flags, p.status,
-        ])
+        writer.writerow(
+            [
+                str(p.id),
+                p.timestamp.isoformat(),
+                p.src_ip,
+                p.dst_ip,
+                p.protocol,
+                p.src_port,
+                p.dst_port,
+                p.packet_size,
+                p.ttl,
+                p.flags,
+                p.status,
+            ]
+        )
 
     output.seek(0)
     return StreamingResponse(

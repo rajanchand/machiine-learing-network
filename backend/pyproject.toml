@@ -83,6 +83,7 @@ ignore = [
     "N806",  # Variable name should be lowercase (allow uppercase X/Y for ML convention)
     "B904",  # Use raise from within except blocks
     "E501",  # Line too long
+    "B008",  # Allow FastAPI Depends/File/Form default function calls
 ]
 
 [tool.mypy]

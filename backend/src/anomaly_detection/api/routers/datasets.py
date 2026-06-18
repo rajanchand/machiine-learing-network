@@ -6,9 +6,9 @@ import os
 import uuid
 
 import pandas as pd
-from fastapi import APIRouter, Query, Request, UploadFile, File
+from fastapi import APIRouter, File, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from anomaly_detection.db.models import Dataset
 from anomaly_detection.schemas.common import DatasetResponse
@@ -46,7 +46,7 @@ async def upload_dataset(
         columns = list(df.columns)
     except Exception as e:
         os.remove(file_path)
-        return JSONResponse(status_code=400, content={"detail": f"Failed to parse CSV: {str(e)}"})
+        return JSONResponse(status_code=400, content={"detail": f"Failed to parse CSV: {e!s}"})
 
     async with session_factory() as session:
         dataset = Dataset(
@@ -80,9 +80,7 @@ async def list_datasets(request: Request) -> list[dict]:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(Dataset).order_by(Dataset.created_at.desc())
-        )
+        result = await session.execute(select(Dataset).order_by(Dataset.created_at.desc()))
         datasets = result.scalars().all()
         return [
             DatasetResponse(
@@ -105,9 +103,7 @@ async def get_dataset(request: Request, dataset_id: str) -> dict:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(Dataset).where(Dataset.id == dataset_id)
-        )
+        result = await session.execute(select(Dataset).where(Dataset.id == dataset_id))
         dataset = result.scalar_one_or_none()
         if not dataset:
             return JSONResponse(status_code=404, content={"detail": "Dataset not found"})
@@ -138,9 +134,7 @@ async def download_dataset(request: Request, dataset_id: str) -> FileResponse:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(Dataset).where(Dataset.id == dataset_id)
-        )
+        result = await session.execute(select(Dataset).where(Dataset.id == dataset_id))
         dataset = result.scalar_one_or_none()
         if not dataset:
             return JSONResponse(status_code=404, content={"detail": "Dataset not found"})
@@ -161,9 +155,7 @@ async def delete_dataset(request: Request, dataset_id: str) -> dict:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(Dataset).where(Dataset.id == dataset_id)
-        )
+        result = await session.execute(select(Dataset).where(Dataset.id == dataset_id))
         dataset = result.scalar_one_or_none()
         if not dataset:
             return JSONResponse(status_code=404, content={"detail": "Dataset not found"})

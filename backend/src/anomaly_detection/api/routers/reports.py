@@ -6,13 +6,13 @@ import csv
 import io
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import func, select
 
-from anomaly_detection.db.models import Report, Attack, Alert, Packet, Prediction
+from anomaly_detection.db.models import Alert, Attack, Packet, Prediction, Report
 from anomaly_detection.schemas.common import ReportGenerateRequest, ReportResponse
 
 router = APIRouter(prefix="/api/v1/reports", tags=["reports"])
@@ -25,7 +25,7 @@ async def generate_report(request: Request, body: ReportGenerateRequest) -> dict
     settings = request.app.state.settings
 
     report_id = uuid.uuid4()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     report_name = f"{body.report_type}_report_{now.strftime('%Y%m%d_%H%M%S')}"
     file_ext = body.report_format
     if file_ext == "excel":
@@ -60,14 +60,18 @@ async def generate_report(request: Request, body: ReportGenerateRequest) -> dict
         # Recent attacks
         writer.writerow(["Recent Attacks"])
         writer.writerow(["Type", "Severity", "Source IP", "Destination IP", "Confidence", "Time"])
-        result = await session.execute(
-            select(Attack).order_by(Attack.detected_at.desc()).limit(50)
-        )
+        result = await session.execute(select(Attack).order_by(Attack.detected_at.desc()).limit(50))
         for a in result.scalars().all():
-            writer.writerow([
-                a.attack_type, a.severity.value, a.src_ip, a.dst_ip,
-                f"{a.confidence:.2%}", a.detected_at.isoformat(),
-            ])
+            writer.writerow(
+                [
+                    a.attack_type,
+                    a.severity.value,
+                    a.src_ip,
+                    a.dst_ip,
+                    f"{a.confidence:.2%}",
+                    a.detected_at.isoformat(),
+                ]
+            )
 
         content = output.getvalue()
         file_size = len(content.encode())
@@ -103,9 +107,7 @@ async def list_reports(request: Request) -> list[dict]:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(Report).order_by(Report.created_at.desc())
-        )
+        result = await session.execute(select(Report).order_by(Report.created_at.desc()))
         reports = result.scalars().all()
         return [
             ReportResponse(
@@ -126,9 +128,7 @@ async def download_report(request: Request, report_id: str) -> FileResponse:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(Report).where(Report.id == report_id)
-        )
+        result = await session.execute(select(Report).where(Report.id == report_id))
         report = result.scalar_one_or_none()
         if not report:
             return JSONResponse(status_code=404, content={"detail": "Report not found"})
@@ -149,9 +149,7 @@ async def delete_report(request: Request, report_id: str) -> dict:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(Report).where(Report.id == report_id)
-        )
+        result = await session.execute(select(Report).where(Report.id == report_id))
         report = result.scalar_one_or_none()
         if not report:
             return JSONResponse(status_code=404, content={"detail": "Report not found"})

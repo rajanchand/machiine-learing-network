@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
@@ -72,16 +74,12 @@ async def create_user(request: Request, body: UserCreateRequest) -> dict:
 
     async with session_factory() as session:
         # Check username exists
-        result = await session.execute(
-            select(User).where(User.username == body.username)
-        )
+        result = await session.execute(select(User).where(User.username == body.username))
         if result.scalar_one_or_none():
             return JSONResponse(status_code=409, content={"detail": "Username already exists"})
 
         # Check email exists
-        result = await session.execute(
-            select(User).where(User.email == body.email)
-        )
+        result = await session.execute(select(User).where(User.email == body.email))
         if result.scalar_one_or_none():
             return JSONResponse(status_code=409, content={"detail": "Email already registered"})
 
@@ -124,9 +122,7 @@ async def update_user(request: Request, user_id: str, body: UserUpdateRequest) -
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(User).where(User.id == user_id)
-        )
+        result = await session.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
         if not user:
             return JSONResponse(status_code=404, content={"detail": "User not found"})
@@ -138,15 +134,11 @@ async def update_user(request: Request, user_id: str, body: UserUpdateRequest) -
         if body.phone is not None:
             user.phone = body.phone
         if body.role is not None:
-            try:
+            with contextlib.suppress(ValueError):
                 user.role = UserRole(body.role)
-            except ValueError:
-                pass
         if body.status is not None:
-            try:
+            with contextlib.suppress(ValueError):
                 user.status = UserStatus(body.status)
-            except ValueError:
-                pass
 
         await session.commit()
 
@@ -159,9 +151,7 @@ async def delete_user(request: Request, user_id: str) -> dict:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(User).where(User.id == user_id)
-        )
+        result = await session.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
         if not user:
             return JSONResponse(status_code=404, content={"detail": "User not found"})
@@ -179,9 +169,7 @@ async def assign_role(request: Request, user_id: str, body: dict) -> dict:
     role_value = body.get("role", "analyst")
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(User).where(User.id == user_id)
-        )
+        result = await session.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
         if not user:
             return JSONResponse(status_code=404, content={"detail": "User not found"})
@@ -203,9 +191,7 @@ async def toggle_status(request: Request, user_id: str, body: dict) -> dict:
     status_value = body.get("status", "active")
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(User).where(User.id == user_id)
-        )
+        result = await session.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
         if not user:
             return JSONResponse(status_code=404, content={"detail": "User not found"})

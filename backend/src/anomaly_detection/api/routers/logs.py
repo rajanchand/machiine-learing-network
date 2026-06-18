@@ -10,12 +10,12 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 
 from anomaly_detection.db.models import (
+    Attack,
     AuditLog,
     LoginLog,
-    SystemLog,
-    Attack,
-    Prediction,
     Packet,
+    Prediction,
+    SystemLog,
 )
 from anomaly_detection.schemas.common import (
     AuditLogResponse,
@@ -55,13 +55,18 @@ async def login_logs(
         return {
             "items": [
                 LoginLogResponse(
-                    id=l.id, username=l.username, ip_address=l.ip_address,
-                    success=l.success, failure_reason=l.failure_reason,
-                    created_at=l.created_at,
+                    id=log_entry.id,
+                    username=log_entry.username,
+                    ip_address=log_entry.ip_address,
+                    success=log_entry.success,
+                    failure_reason=log_entry.failure_reason,
+                    created_at=log_entry.created_at,
                 ).model_dump()
-                for l in logs
+                for log_entry in logs
             ],
-            "total": total, "page": page, "per_page": per_page,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
             "total_pages": max(1, (total + per_page - 1) // per_page),
         }
 
@@ -86,14 +91,19 @@ async def packet_logs(
         return {
             "items": [
                 {
-                    "id": str(p.id), "timestamp": p.timestamp.isoformat(),
-                    "src_ip": p.src_ip, "dst_ip": p.dst_ip,
-                    "protocol": p.protocol, "packet_size": p.packet_size,
+                    "id": str(p.id),
+                    "timestamp": p.timestamp.isoformat(),
+                    "src_ip": p.src_ip,
+                    "dst_ip": p.dst_ip,
+                    "protocol": p.protocol,
+                    "packet_size": p.packet_size,
                     "status": p.status,
                 }
                 for p in packets
             ],
-            "total": total, "page": page, "per_page": per_page,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
             "total_pages": max(1, (total + per_page - 1) // per_page),
         }
 
@@ -118,14 +128,19 @@ async def attack_logs(
         return {
             "items": [
                 {
-                    "id": str(a.id), "attack_type": a.attack_type,
-                    "severity": a.severity.value, "src_ip": a.src_ip,
-                    "dst_ip": a.dst_ip, "confidence": a.confidence,
+                    "id": str(a.id),
+                    "attack_type": a.attack_type,
+                    "severity": a.severity.value,
+                    "src_ip": a.src_ip,
+                    "dst_ip": a.dst_ip,
+                    "confidence": a.confidence,
                     "detected_at": a.detected_at.isoformat(),
                 }
                 for a in attacks
             ],
-            "total": total, "page": page, "per_page": per_page,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
             "total_pages": max(1, (total + per_page - 1) // per_page),
         }
 
@@ -150,14 +165,18 @@ async def prediction_logs(
         return {
             "items": [
                 {
-                    "id": str(p.id), "model_name": p.model_name,
-                    "is_anomaly": p.is_anomaly, "confidence": p.confidence,
+                    "id": str(p.id),
+                    "model_name": p.model_name,
+                    "is_anomaly": p.is_anomaly,
+                    "confidence": p.confidence,
                     "prediction_label": p.prediction_label,
                     "created_at": p.created_at.isoformat(),
                 }
                 for p in preds
             ],
-            "total": total, "page": page, "per_page": per_page,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
             "total_pages": max(1, (total + per_page - 1) // per_page),
         }
 
@@ -190,12 +209,17 @@ async def system_logs(
         return {
             "items": [
                 SystemLogResponse(
-                    id=l.id, level=l.level, source=l.source,
-                    message=l.message, created_at=l.created_at,
+                    id=log_entry.id,
+                    level=log_entry.level,
+                    source=log_entry.source,
+                    message=log_entry.message,
+                    created_at=log_entry.created_at,
                 ).model_dump()
-                for l in logs
+                for log_entry in logs
             ],
-            "total": total, "page": page, "per_page": per_page,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
             "total_pages": max(1, (total + per_page - 1) // per_page),
         }
 
@@ -220,13 +244,19 @@ async def audit_logs(
         return {
             "items": [
                 AuditLogResponse(
-                    id=l.id, action=l.action, resource=l.resource,
-                    resource_id=l.resource_id, details=l.details,
-                    ip_address=l.ip_address, created_at=l.created_at,
+                    id=log_entry.id,
+                    action=log_entry.action,
+                    resource=log_entry.resource,
+                    resource_id=log_entry.resource_id,
+                    details=log_entry.details,
+                    ip_address=log_entry.ip_address,
+                    created_at=log_entry.created_at,
                 ).model_dump()
-                for l in logs
+                for log_entry in logs
             ],
-            "total": total, "page": page, "per_page": per_page,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
             "total_pages": max(1, (total + per_page - 1) // per_page),
         }
 
@@ -241,19 +271,49 @@ async def export_logs(request: Request, log_type: str = "system") -> StreamingRe
     async with session_factory() as session:
         if log_type == "login":
             writer.writerow(["Username", "IP Address", "Success", "Reason", "Timestamp"])
-            result = await session.execute(select(LoginLog).order_by(LoginLog.created_at.desc()).limit(5000))
-            for l in result.scalars().all():
-                writer.writerow([l.username, l.ip_address, l.success, l.failure_reason, l.created_at.isoformat()])
+            result = await session.execute(
+                select(LoginLog).order_by(LoginLog.created_at.desc()).limit(5000)
+            )
+            for log_entry in result.scalars().all():
+                writer.writerow(
+                    [
+                        log_entry.username,
+                        log_entry.ip_address,
+                        log_entry.success,
+                        log_entry.failure_reason,
+                        log_entry.created_at.isoformat(),
+                    ]
+                )
         elif log_type == "system":
             writer.writerow(["Level", "Source", "Message", "Timestamp"])
-            result = await session.execute(select(SystemLog).order_by(SystemLog.created_at.desc()).limit(5000))
-            for l in result.scalars().all():
-                writer.writerow([l.level, l.source, l.message, l.created_at.isoformat()])
+            result = await session.execute(
+                select(SystemLog).order_by(SystemLog.created_at.desc()).limit(5000)
+            )
+            for log_entry in result.scalars().all():
+                writer.writerow(
+                    [
+                        log_entry.level,
+                        log_entry.source,
+                        log_entry.message,
+                        log_entry.created_at.isoformat(),
+                    ]
+                )
         elif log_type == "audit":
             writer.writerow(["Action", "Resource", "Resource ID", "Details", "IP", "Timestamp"])
-            result = await session.execute(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(5000))
-            for l in result.scalars().all():
-                writer.writerow([l.action, l.resource, l.resource_id, l.details, l.ip_address, l.created_at.isoformat()])
+            result = await session.execute(
+                select(AuditLog).order_by(AuditLog.created_at.desc()).limit(5000)
+            )
+            for log_entry in result.scalars().all():
+                writer.writerow(
+                    [
+                        log_entry.action,
+                        log_entry.resource,
+                        log_entry.resource_id,
+                        log_entry.details,
+                        log_entry.ip_address,
+                        log_entry.created_at.isoformat(),
+                    ]
+                )
 
     output.seek(0)
     return StreamingResponse(

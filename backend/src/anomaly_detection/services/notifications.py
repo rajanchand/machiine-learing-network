@@ -56,7 +56,10 @@ class NotificationService:
                     "fields": [
                         {"type": "mrkdwn", "text": f"*Alert ID:*\n`{alert_id}`"},
                         {"type": "mrkdwn", "text": f"*Environment:*\n`{self.env}`"},
-                        {"type": "mrkdwn", "text": f"*Suspected Threat:*\n`{suspected_attack_type or 'Unknown'}`"},
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Suspected Threat:*\n`{suspected_attack_type or 'Unknown'}`",
+                        },
                         {"type": "mrkdwn", "text": f"*Anomaly Score:*\n`{score:.4f}`"},
                         {"type": "mrkdwn", "text": f"*Source Connection:*\n`{src_ip}`"},
                         {"type": "mrkdwn", "text": f"*Destination Connection:*\n`{dst_ip}`"},

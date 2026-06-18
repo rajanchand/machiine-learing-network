@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy import select
@@ -33,9 +33,7 @@ async def login(request: Request, body: LoginRequest) -> TokenResponse:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(User).where(User.username == body.username)
-        )
+        result = await session.execute(select(User).where(User.username == body.username))
         user = result.scalar_one_or_none()
 
         # Log the attempt
@@ -44,26 +42,30 @@ async def login(request: Request, body: LoginRequest) -> TokenResponse:
 
         if not user or not verify_password(body.password, user.password_hash):
             # Log failed login
-            session.add(LoginLog(
-                user_id=user.id if user else None,
-                username=body.username,
-                ip_address=client_ip,
-                user_agent=user_agent,
-                success=False,
-                failure_reason="Invalid credentials",
-            ))
+            session.add(
+                LoginLog(
+                    user_id=user.id if user else None,
+                    username=body.username,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    success=False,
+                    failure_reason="Invalid credentials",
+                )
+            )
             await session.commit()
             raise HTTPException(status_code=401, detail="Invalid username or password")
 
         if user.status != UserStatus.ACTIVE:
-            session.add(LoginLog(
-                user_id=user.id,
-                username=body.username,
-                ip_address=client_ip,
-                user_agent=user_agent,
-                success=False,
-                failure_reason=f"Account {user.status.value}",
-            ))
+            session.add(
+                LoginLog(
+                    user_id=user.id,
+                    username=body.username,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    success=False,
+                    failure_reason=f"Account {user.status.value}",
+                )
+            )
             await session.commit()
             raise HTTPException(status_code=403, detail="Account is not active")
 
@@ -79,16 +81,18 @@ async def login(request: Request, body: LoginRequest) -> TokenResponse:
         )
 
         # Update last login
-        user.last_login = datetime.now(timezone.utc)
+        user.last_login = datetime.now(UTC)
 
         # Log successful login
-        session.add(LoginLog(
-            user_id=user.id,
-            username=user.username,
-            ip_address=client_ip,
-            user_agent=user_agent,
-            success=True,
-        ))
+        session.add(
+            LoginLog(
+                user_id=user.id,
+                username=user.username,
+                ip_address=client_ip,
+                user_agent=user_agent,
+                success=True,
+            )
+        )
         await session.commit()
 
         user_resp = UserResponse(
@@ -119,16 +123,12 @@ async def register(request: Request, body: RegisterRequest) -> dict:
 
     async with session_factory() as session:
         # Check username exists
-        result = await session.execute(
-            select(User).where(User.username == body.username)
-        )
+        result = await session.execute(select(User).where(User.username == body.username))
         if result.scalar_one_or_none():
             raise HTTPException(status_code=409, detail="Username already exists")
 
         # Check email exists
-        result = await session.execute(
-            select(User).where(User.email == body.email)
-        )
+        result = await session.execute(select(User).where(User.email == body.email))
         if result.scalar_one_or_none():
             raise HTTPException(status_code=409, detail="Email already registered")
 
@@ -170,9 +170,7 @@ async def refresh_token(request: Request, body: RefreshRequest) -> TokenResponse
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(User).where(User.id == user_info["user_id"])
-        )
+        result = await session.execute(select(User).where(User.id == user_info["user_id"]))
         user = result.scalar_one_or_none()
         if not user or user.status != UserStatus.ACTIVE:
             raise HTTPException(status_code=401, detail="User not found or inactive")

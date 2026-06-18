@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import psutil
 from fastapi import APIRouter, Request
@@ -10,12 +10,11 @@ from sqlalchemy import func, select
 
 from anomaly_detection.db.models import (
     Alert,
-    AlertSeverity,
     Attack,
-    Packet,
-    Prediction,
     MLModel,
     ModelStatus,
+    Packet,
+    Prediction,
 )
 from anomaly_detection.schemas.common import DashboardStats, RecentAlert, RecentPrediction
 
@@ -29,14 +28,10 @@ async def get_dashboard_stats(request: Request) -> DashboardStats:
 
     async with session_factory() as session:
         # Total packets
-        total_packets = (
-            await session.execute(select(func.count(Packet.id)))
-        ).scalar() or 0
+        total_packets = (await session.execute(select(func.count(Packet.id)))).scalar() or 0
 
         # Total predictions
-        total_predictions = (
-            await session.execute(select(func.count(Prediction.id)))
-        ).scalar() or 0
+        total_predictions = (await session.execute(select(func.count(Prediction.id)))).scalar() or 0
 
         # Anomalies
         anomalies = (
@@ -48,7 +43,7 @@ async def get_dashboard_stats(request: Request) -> DashboardStats:
         normal_traffic = total_predictions - anomalies
 
         # Today's attacks
-        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
         todays_attacks = (
             await session.execute(
                 select(func.count(Attack.id)).where(Attack.detected_at >= today_start)
@@ -75,14 +70,12 @@ async def get_dashboard_stats(request: Request) -> DashboardStats:
 
         # Active model accuracy
         active_model = (
-            await session.execute(
-                select(MLModel).where(MLModel.status == ModelStatus.ACTIVE)
-            )
+            await session.execute(select(MLModel).where(MLModel.status == ModelStatus.ACTIVE))
         ).scalar_one_or_none()
         model_accuracy = active_model.accuracy * 100 if active_model else 0.0
 
         # Unique active devices (unique IPs in last hour)
-        one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+        one_hour_ago = datetime.now(UTC) - timedelta(hours=1)
         active_src = (
             await session.execute(
                 select(func.count(func.distinct(Packet.src_ip))).where(
@@ -114,9 +107,7 @@ async def get_recent_alerts(request: Request) -> list[RecentAlert]:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(Alert).order_by(Alert.created_at.desc()).limit(10)
-        )
+        result = await session.execute(select(Alert).order_by(Alert.created_at.desc()).limit(10))
         alerts = result.scalars().all()
         return [
             RecentAlert(
@@ -164,11 +155,11 @@ async def get_system_health(request: Request) -> dict:
     return {
         "cpu_usage": round(cpu, 1),
         "memory_usage": round(memory.percent, 1),
-        "memory_total_gb": round(memory.total / (1024 ** 3), 1),
-        "memory_used_gb": round(memory.used / (1024 ** 3), 1),
+        "memory_total_gb": round(memory.total / (1024**3), 1),
+        "memory_used_gb": round(memory.used / (1024**3), 1),
         "disk_usage": round(disk.percent, 1),
-        "disk_total_gb": round(disk.total / (1024 ** 3), 1),
-        "disk_used_gb": round(disk.used / (1024 ** 3), 1),
+        "disk_total_gb": round(disk.total / (1024**3), 1),
+        "disk_used_gb": round(disk.used / (1024**3), 1),
     }
 
 
@@ -176,7 +167,7 @@ async def get_system_health(request: Request) -> dict:
 async def get_traffic_chart(request: Request) -> list[dict]:
     """Get traffic data for line chart (last 24 hours, hourly)."""
     session_factory = request.app.state.session_factory
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     data = []
 
     async with session_factory() as session:
@@ -191,10 +182,12 @@ async def get_traffic_chart(request: Request) -> list[dict]:
                     )
                 )
             ).scalar() or 0
-            data.append({
-                "time": hour_start.strftime("%H:%M"),
-                "packets": count,
-            })
+            data.append(
+                {
+                    "time": hour_start.strftime("%H:%M"),
+                    "packets": count,
+                }
+            )
 
     return data
 
@@ -209,7 +202,10 @@ async def get_protocol_chart(request: Request) -> list[dict]:
             select(
                 Packet.protocol,
                 func.count(Packet.id).label("count"),
-            ).group_by(Packet.protocol).order_by(func.count(Packet.id).desc()).limit(10)
+            )
+            .group_by(Packet.protocol)
+            .order_by(func.count(Packet.id).desc())
+            .limit(10)
         )
         rows = result.all()
         return [{"protocol": row[0], "count": row[1]} for row in rows]
@@ -225,7 +221,9 @@ async def get_attack_chart(request: Request) -> list[dict]:
             select(
                 Attack.attack_type,
                 func.count(Attack.id).label("count"),
-            ).group_by(Attack.attack_type).order_by(func.count(Attack.id).desc())
+            )
+            .group_by(Attack.attack_type)
+            .order_by(func.count(Attack.id).desc())
         )
         rows = result.all()
         return [{"type": row[0], "count": row[1]} for row in rows]

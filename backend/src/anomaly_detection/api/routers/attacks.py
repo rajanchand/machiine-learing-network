@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 
-from anomaly_detection.db.models import Attack, AlertSeverity, BlockedIP
+from anomaly_detection.db.models import AlertSeverity, Attack, BlockedIP
 from anomaly_detection.schemas.common import AttackResponse, BlockIPRequest
 
 router = APIRouter(prefix="/api/v1/attacks", tags=["attacks"])
@@ -79,9 +77,7 @@ async def get_attack(request: Request, attack_id: str) -> dict:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(Attack).where(Attack.id == attack_id)
-        )
+        result = await session.execute(select(Attack).where(Attack.id == attack_id))
         attack = result.scalar_one_or_none()
         if not attack:
             return JSONResponse(status_code=404, content={"detail": "Attack not found"})
@@ -123,9 +119,7 @@ async def block_ip(request: Request, body: BlockIPRequest) -> dict:
         session.add(blocked)
 
         # Mark related attacks as blocked
-        result = await session.execute(
-            select(Attack).where(Attack.src_ip == body.ip_address)
-        )
+        result = await session.execute(select(Attack).where(Attack.src_ip == body.ip_address))
         for attack in result.scalars().all():
             attack.is_blocked = True
 
@@ -140,9 +134,7 @@ async def list_blocked_ips(request: Request) -> list[dict]:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(BlockedIP).order_by(BlockedIP.blocked_at.desc())
-        )
+        result = await session.execute(select(BlockedIP).order_by(BlockedIP.blocked_at.desc()))
         ips = result.scalars().all()
         return [
             {
@@ -162,9 +154,7 @@ async def unblock_ip(request: Request, ip_address: str) -> dict:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(BlockedIP).where(BlockedIP.ip_address == ip_address)
-        )
+        result = await session.execute(select(BlockedIP).where(BlockedIP.ip_address == ip_address))
         blocked = result.scalar_one_or_none()
         if blocked:
             await session.delete(blocked)

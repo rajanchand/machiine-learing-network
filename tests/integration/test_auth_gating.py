@@ -127,7 +127,7 @@ async def test_auth_lifecycle(unauthenticated_app, session_factory):
         # Logout -> 200
         res_logout = await client.post("/api/v1/auth/logout")
         assert res_logout.status_code == 200
-        
+
         # Remove header to simulate logout
         del client.headers["Authorization"]
 

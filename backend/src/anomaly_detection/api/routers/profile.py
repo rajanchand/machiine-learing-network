@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
-from anomaly_detection.db.models import User, AuditLog
+from anomaly_detection.db.models import AuditLog, User
 from anomaly_detection.schemas.common import UserResponse
 
 router = APIRouter(prefix="/api/v1/profile", tags=["profile"])
@@ -91,10 +91,10 @@ async def user_activity(request: Request) -> list[dict]:
 
         return [
             {
-                "action": l.action,
-                "resource": l.resource,
-                "details": l.details,
-                "timestamp": l.created_at.isoformat(),
+                "action": log_entry.action,
+                "resource": log_entry.resource,
+                "details": log_entry.details,
+                "timestamp": log_entry.created_at.isoformat(),
             }
-            for l in logs
+            for log_entry in logs
         ]

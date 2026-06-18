@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
@@ -93,9 +93,7 @@ async def alert_counts(request: Request) -> dict:
             )
         ).scalar() or 0
         unread = (
-            await session.execute(
-                select(func.count(Alert.id)).where(Alert.is_read.is_(False))
-            )
+            await session.execute(select(func.count(Alert.id)).where(Alert.is_read.is_(False)))
         ).scalar() or 0
         open_count = (
             await session.execute(
@@ -118,9 +116,7 @@ async def update_alert(request: Request, alert_id: str, body: AlertUpdateRequest
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(Alert).where(Alert.id == alert_id)
-        )
+        result = await session.execute(select(Alert).where(Alert.id == alert_id))
         alert = result.scalar_one_or_none()
         if not alert:
             return JSONResponse(status_code=404, content={"detail": "Alert not found"})
@@ -129,7 +125,7 @@ async def update_alert(request: Request, alert_id: str, body: AlertUpdateRequest
             try:
                 alert.status = AlertStatus(body.status)
                 if body.status == "resolved":
-                    alert.resolved_at = datetime.now(timezone.utc)
+                    alert.resolved_at = datetime.now(UTC)
             except ValueError:
                 pass
         if body.is_read is not None:
@@ -146,9 +142,7 @@ async def mark_all_read(request: Request) -> dict:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(Alert).where(Alert.is_read.is_(False))
-        )
+        result = await session.execute(select(Alert).where(Alert.is_read.is_(False)))
         for alert in result.scalars().all():
             alert.is_read = True
         await session.commit()

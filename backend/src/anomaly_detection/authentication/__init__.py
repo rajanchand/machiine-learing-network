@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 class TokenPayload(BaseModel):
     """JWT token payload schema."""
+
     sub: str  # user_id
     username: str
     role: str
@@ -22,6 +23,7 @@ class TokenPayload(BaseModel):
 
 class TokenPair(BaseModel):
     """Access + Refresh token pair."""
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -48,7 +50,7 @@ def create_access_token(
     expiry_minutes: int = 60,
 ) -> str:
     """Create a JWT access token."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": user_id,
         "username": username,
@@ -69,7 +71,7 @@ def create_refresh_token(
     expiry_days: int = 7,
 ) -> str:
     """Create a JWT refresh token."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": user_id,
         "username": username,

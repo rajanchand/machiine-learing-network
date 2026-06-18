@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import random
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
@@ -31,7 +31,7 @@ async def start_monitoring(request: Request, body: dict | None = None) -> dict:
     _monitoring_state["packet_count"] = 0
     _monitoring_state["incoming_bytes"] = 0
     _monitoring_state["outgoing_bytes"] = 0
-    _monitoring_state["start_time"] = datetime.now(timezone.utc).isoformat()
+    _monitoring_state["start_time"] = datetime.now(UTC).isoformat()
     return {"message": "Monitoring started", "interface": interface}
 
 
@@ -67,10 +67,10 @@ async def list_interfaces() -> list[dict]:
     ]
     try:
         import psutil
+
         real_interfaces = psutil.net_if_addrs()
         interfaces = [
-            {"name": name, "description": name, "status": "up"}
-            for name in real_interfaces.keys()
+            {"name": name, "description": name, "status": "up"} for name in real_interfaces
         ]
     except Exception:
         pass
@@ -107,25 +107,28 @@ async def monitoring_feed(request: Request) -> StreamingResponse:
         protocols = ["TCP", "UDP", "ICMP", "HTTP", "HTTPS", "DNS", "SSH", "FTP"]
         while True:
             if not _monitoring_state["is_running"]:
-                yield f"data: {{\"status\": \"paused\"}}\n\n"
+                yield 'data: {"status": "paused"}\n\n'
                 await asyncio.sleep(2)
                 continue
 
             _monitoring_state["packet_count"] += 1
             packet = {
                 "id": _monitoring_state["packet_count"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "src_ip": f"192.168.{random.randint(1, 10)}.{random.randint(1, 254)}",
                 "dst_ip": f"10.0.{random.randint(0, 5)}.{random.randint(1, 254)}",
                 "protocol": random.choice(protocols),
                 "src_port": random.randint(1024, 65535),
                 "dst_port": random.choice([80, 443, 22, 53, 8080, 3306, 5432]),
                 "size": random.randint(40, 1500),
-                "status": random.choices(["Normal", "Suspicious", "Malicious"], weights=[85, 10, 5])[0],
+                "status": random.choices(
+                    ["Normal", "Suspicious", "Malicious"], weights=[85, 10, 5]
+                )[0],
             }
             _monitoring_state["incoming_bytes"] += packet["size"]
 
             import json
+
             yield f"data: {json.dumps(packet)}\n\n"
             await asyncio.sleep(random.uniform(0.1, 0.5))
 

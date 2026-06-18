@@ -39,6 +39,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 # =============================================================================
 class Base(DeclarativeBase):
     """Base class for all ORM models."""
+
     pass
 
 
@@ -47,6 +48,7 @@ class Base(DeclarativeBase):
 # =============================================================================
 class UserRole(enum.Enum):
     """User roles for RBAC."""
+
     ADMIN = "admin"
     ANALYST = "analyst"
     VIEWER = "viewer"
@@ -54,6 +56,7 @@ class UserRole(enum.Enum):
 
 class UserStatus(enum.Enum):
     """User account status."""
+
     ACTIVE = "active"
     INACTIVE = "inactive"
     SUSPENDED = "suspended"
@@ -61,6 +64,7 @@ class UserStatus(enum.Enum):
 
 class AlertSeverity(enum.Enum):
     """Alert severity levels."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -69,6 +73,7 @@ class AlertSeverity(enum.Enum):
 
 class AlertStatus(enum.Enum):
     """Alert lifecycle status."""
+
     OPEN = "open"
     ACKNOWLEDGED = "acknowledged"
     RESOLVED = "resolved"
@@ -76,6 +81,7 @@ class AlertStatus(enum.Enum):
 
 class AttackType(enum.Enum):
     """Supported attack classifications."""
+
     DDOS = "DDoS"
     DOS = "DoS"
     PORT_SCAN = "Port Scan"
@@ -91,6 +97,7 @@ class AttackType(enum.Enum):
 
 class ModelStatus(enum.Enum):
     """ML model status."""
+
     ACTIVE = "active"
     INACTIVE = "inactive"
     TRAINING = "training"
@@ -99,6 +106,7 @@ class ModelStatus(enum.Enum):
 
 class ReportFormat(enum.Enum):
     """Report export formats."""
+
     PDF = "pdf"
     EXCEL = "excel"
     CSV = "csv"
@@ -106,6 +114,7 @@ class ReportFormat(enum.Enum):
 
 class ReportType(enum.Enum):
     """Report period types."""
+
     DAILY = "daily"
     WEEKLY = "weekly"
     MONTHLY = "monthly"
@@ -114,6 +123,7 @@ class ReportType(enum.Enum):
 
 class LogLevel(enum.Enum):
     """System log severity levels."""
+
     DEBUG = "debug"
     INFO = "info"
     WARNING = "warning"
@@ -123,6 +133,7 @@ class LogLevel(enum.Enum):
 
 class CaptureStatus(enum.Enum):
     """Packet capture session status."""
+
     RUNNING = "running"
     STOPPED = "stopped"
     COMPLETED = "completed"
@@ -134,45 +145,31 @@ class CaptureStatus(enum.Enum):
 # =============================================================================
 class User(Base):
     """User accounts with role-based access control."""
+
     __tablename__ = "users"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    username: Mapped[str] = mapped_column(
-        String(128), unique=True, nullable=False, index=True
-    )
-    email: Mapped[str] = mapped_column(
-        String(256), unique=True, nullable=False, index=True
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    username: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(256), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
     full_name: Mapped[str] = mapped_column(String(256), nullable=False, default="")
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole), nullable=False, default=UserRole.ANALYST
-    )
+    role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False, default=UserRole.ANALYST)
     status: Mapped[UserStatus] = mapped_column(
         Enum(UserStatus), nullable=False, default=UserStatus.ACTIVE
     )
     avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    last_login: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now(),
-        onupdate=func.now()
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
     # Relationships
-    login_logs: Mapped[list[LoginLog]] = relationship(
-        back_populates="user", lazy="selectin"
-    )
-    audit_logs: Mapped[list[AuditLog]] = relationship(
-        back_populates="user", lazy="selectin"
-    )
+    login_logs: Mapped[list[LoginLog]] = relationship(back_populates="user", lazy="selectin")
+    audit_logs: Mapped[list[AuditLog]] = relationship(back_populates="user", lazy="selectin")
 
     __table_args__ = (
         Index("ix_user_role", "role"),
@@ -185,11 +182,10 @@ class User(Base):
 # =============================================================================
 class PacketCapture(Base):
     """Packet capture session metadata."""
+
     __tablename__ = "packet_captures"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     interface: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[CaptureStatus] = mapped_column(
         Enum(CaptureStatus), nullable=False, default=CaptureStatus.RUNNING
@@ -198,29 +194,23 @@ class PacketCapture(Base):
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
-    stopped_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    stopped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     # Relationships
-    packets: Mapped[list[Packet]] = relationship(
-        back_populates="capture", lazy="selectin"
-    )
+    packets: Mapped[list[Packet]] = relationship(back_populates="capture", lazy="selectin")
 
 
 class Packet(Base):
     """Individual captured network packet records."""
+
     __tablename__ = "packets"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     capture_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("packet_captures.id", ondelete="CASCADE"),
-        nullable=True
+        UUID(as_uuid=True), ForeignKey("packet_captures.id", ondelete="CASCADE"), nullable=True
     )
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
@@ -249,11 +239,10 @@ class Packet(Base):
 # =============================================================================
 class MLModel(Base):
     """Registered ML model metadata, metrics, and feature importance."""
+
     __tablename__ = "ml_models"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     model_type: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     version: Mapped[str] = mapped_column(String(64), nullable=False, default="v1")
@@ -287,28 +276,22 @@ class MLModel(Base):
     )
 
     # Relationships
-    predictions: Mapped[list[Prediction]] = relationship(
-        back_populates="model", lazy="selectin"
-    )
+    predictions: Mapped[list[Prediction]] = relationship(back_populates="model", lazy="selectin")
 
 
 class Prediction(Base):
     """ML model prediction results for network flows."""
+
     __tablename__ = "predictions"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     model_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("ml_models.id", ondelete="SET NULL"),
-        nullable=True
+        UUID(as_uuid=True), ForeignKey("ml_models.id", ondelete="SET NULL"), nullable=True
     )
     model_name: Mapped[str] = mapped_column(String(128), nullable=False)
     is_anomaly: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    prediction_label: Mapped[str] = mapped_column(
-        String(64), nullable=False, default="Normal"
-    )
+    prediction_label: Mapped[str] = mapped_column(String(64), nullable=False, default="Normal")
     features_json: Mapped[dict[str, Any] | None] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"), nullable=True
     )
@@ -324,11 +307,10 @@ class Prediction(Base):
 
 class Dataset(Base):
     """Uploaded dataset metadata for ML training."""
+
     __tablename__ = "datasets"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     filename: Mapped[str] = mapped_column(String(512), nullable=False)
     file_path: Mapped[str] = mapped_column(Text, nullable=False)
@@ -351,11 +333,10 @@ class Dataset(Base):
 # =============================================================================
 class Attack(Base):
     """Detected network attack records."""
+
     __tablename__ = "attacks"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     attack_type: Mapped[str] = mapped_column(String(64), nullable=False, default="Unknown")
     severity: Mapped[AlertSeverity] = mapped_column(
         Enum(AlertSeverity), nullable=False, default=AlertSeverity.MEDIUM
@@ -382,11 +363,10 @@ class Attack(Base):
 
 class Alert(Base):
     """Anomaly alerts with lifecycle status tracking."""
+
     __tablename__ = "alerts"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title: Mapped[str] = mapped_column(String(256), nullable=False, default="Anomaly Detected")
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     severity: Mapped[AlertSeverity] = mapped_column(
@@ -402,9 +382,7 @@ class Alert(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
-    resolved_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index("ix_alert_status", "status"),
@@ -415,14 +393,11 @@ class Alert(Base):
 
 class BlockedIP(Base):
     """Blocked IP addresses from attack detection."""
+
     __tablename__ = "blocked_ips"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    ip_address: Mapped[str] = mapped_column(
-        String(45), nullable=False, unique=True, index=True
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ip_address: Mapped[str] = mapped_column(String(45), nullable=False, unique=True, index=True)
     reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
     attack_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     blocked_by: Mapped[uuid.UUID | None] = mapped_column(
@@ -438,22 +413,17 @@ class BlockedIP(Base):
 # =============================================================================
 class Report(Base):
     """Generated report metadata."""
+
     __tablename__ = "reports"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     report_type: Mapped[str] = mapped_column(String(32), nullable=False, default="daily")
     report_format: Mapped[str] = mapped_column(String(16), nullable=False, default="pdf")
     file_path: Mapped[str] = mapped_column(Text, nullable=False)
     file_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    date_from: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    date_to: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    date_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    date_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     generated_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -467,11 +437,10 @@ class Report(Base):
 # =============================================================================
 class LoginLog(Base):
     """Login attempt audit trail."""
+
     __tablename__ = "login_logs"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -490,11 +459,10 @@ class LoginLog(Base):
 
 class SystemLog(Base):
     """Application system event log."""
+
     __tablename__ = "system_logs"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     level: Mapped[str] = mapped_column(String(16), nullable=False, default="info")
     source: Mapped[str] = mapped_column(String(128), nullable=False, default="system")
     message: Mapped[str] = mapped_column(Text, nullable=False)
@@ -508,11 +476,10 @@ class SystemLog(Base):
 
 class AuditLog(Base):
     """User action audit trail for compliance."""
+
     __tablename__ = "audit_logs"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -534,17 +501,13 @@ class AuditLog(Base):
 # =============================================================================
 class Setting(Base):
     """Key-value system configuration store."""
+
     __tablename__ = "settings"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    key: Mapped[str] = mapped_column(
-        String(128), nullable=False, unique=True, index=True
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
     value: Mapped[str] = mapped_column(Text, nullable=False, default="")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now(),
-        onupdate=func.now()
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )

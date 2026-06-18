@@ -9,8 +9,8 @@ async def init_db() -> None:
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-    from anomaly_detection.db.models import User
     from anomaly_detection.authentication import hash_password
+    from anomaly_detection.db.models import User
 
     settings = get_settings()
     print(f"Initializing database at: {settings.database_url}")

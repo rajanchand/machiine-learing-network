@@ -8,7 +8,11 @@ from sqlalchemy import select
 
 from anomaly_detection.authentication import hash_password, verify_password
 from anomaly_detection.db.models import Setting, User
-from anomaly_detection.schemas.common import ChangePasswordRequest, SettingResponse, SettingUpdateRequest
+from anomaly_detection.schemas.common import (
+    ChangePasswordRequest,
+    SettingResponse,
+    SettingUpdateRequest,
+)
 
 router = APIRouter(prefix="/api/v1/settings", tags=["settings"])
 
@@ -26,13 +30,33 @@ async def get_settings(request: Request) -> list[dict]:
             # Return default settings
             return [
                 {"key": "theme", "value": "light", "description": "UI Theme"},
-                {"key": "notification_email", "value": "true", "description": "Email notifications"},
-                {"key": "notification_browser", "value": "true", "description": "Browser notifications"},
+                {
+                    "key": "notification_email",
+                    "value": "true",
+                    "description": "Email notifications",
+                },
+                {
+                    "key": "notification_browser",
+                    "value": "true",
+                    "description": "Browser notifications",
+                },
                 {"key": "auto_refresh", "value": "true", "description": "Auto-refresh dashboard"},
-                {"key": "refresh_interval", "value": "30", "description": "Refresh interval (seconds)"},
+                {
+                    "key": "refresh_interval",
+                    "value": "30",
+                    "description": "Refresh interval (seconds)",
+                },
                 {"key": "api_url", "value": "http://localhost:8000", "description": "API Base URL"},
-                {"key": "max_packet_capture", "value": "10000", "description": "Max packets per capture"},
-                {"key": "alert_threshold", "value": "0.8", "description": "Alert confidence threshold"},
+                {
+                    "key": "max_packet_capture",
+                    "value": "10000",
+                    "description": "Max packets per capture",
+                },
+                {
+                    "key": "alert_threshold",
+                    "value": "0.8",
+                    "description": "Alert confidence threshold",
+                },
             ]
 
         return [
@@ -48,9 +72,7 @@ async def update_settings(request: Request, body: SettingUpdateRequest) -> dict:
 
     async with session_factory() as session:
         for key, value in body.settings.items():
-            result = await session.execute(
-                select(Setting).where(Setting.key == key)
-            )
+            result = await session.execute(select(Setting).where(Setting.key == key))
             setting = result.scalar_one_or_none()
             if setting:
                 setting.value = value
@@ -81,7 +103,9 @@ async def change_password(request: Request, body: ChangePasswordRequest) -> dict
             return JSONResponse(status_code=404, content={"detail": "User not found"})
 
         if not verify_password(body.current_password, user.password_hash):
-            return JSONResponse(status_code=400, content={"detail": "Current password is incorrect"})
+            return JSONResponse(
+                status_code=400, content={"detail": "Current password is incorrect"}
+            )
 
         user.password_hash = hash_password(body.new_password)
         await session.commit()

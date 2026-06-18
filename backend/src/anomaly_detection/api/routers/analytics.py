@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Request
 from sqlalchemy import func, select
 
-from anomaly_detection.db.models import Attack, MLModel, Packet, Prediction
+from anomaly_detection.db.models import Attack, MLModel, Packet
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["analytics"])
 
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/v1/analytics", tags=["analytics"])
 async def traffic_trends(request: Request) -> list[dict]:
     """Get traffic volume over the last 7 days."""
     session_factory = request.app.state.session_factory
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     data = []
 
     async with session_factory() as session:
@@ -32,11 +32,13 @@ async def traffic_trends(request: Request) -> list[dict]:
                     )
                 )
             ).scalar() or 0
-            data.append({
-                "date": day_start.strftime("%Y-%m-%d"),
-                "label": day_start.strftime("%a"),
-                "count": count if count > 0 else random.randint(500, 3000),
-            })
+            data.append(
+                {
+                    "date": day_start.strftime("%Y-%m-%d"),
+                    "label": day_start.strftime("%a"),
+                    "count": count if count > 0 else random.randint(500, 3000),
+                }
+            )
 
     return data
 
@@ -45,7 +47,7 @@ async def traffic_trends(request: Request) -> list[dict]:
 async def attack_trends(request: Request) -> list[dict]:
     """Get attack counts over the last 7 days."""
     session_factory = request.app.state.session_factory
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     data = []
 
     async with session_factory() as session:
@@ -60,11 +62,13 @@ async def attack_trends(request: Request) -> list[dict]:
                     )
                 )
             ).scalar() or 0
-            data.append({
-                "date": day_start.strftime("%Y-%m-%d"),
-                "label": day_start.strftime("%a"),
-                "count": count if count > 0 else random.randint(5, 50),
-            })
+            data.append(
+                {
+                    "date": day_start.strftime("%Y-%m-%d"),
+                    "label": day_start.strftime("%a"),
+                    "count": count if count > 0 else random.randint(5, 50),
+                }
+            )
 
     return data
 
@@ -79,7 +83,9 @@ async def protocol_usage(request: Request) -> list[dict]:
             select(
                 Packet.protocol,
                 func.count(Packet.id).label("count"),
-            ).group_by(Packet.protocol).order_by(func.count(Packet.id).desc())
+            )
+            .group_by(Packet.protocol)
+            .order_by(func.count(Packet.id).desc())
         )
         rows = result.all()
         if rows:
@@ -107,7 +113,10 @@ async def top_attackers(request: Request) -> list[dict]:
             select(
                 Attack.src_ip,
                 func.count(Attack.id).label("attack_count"),
-            ).group_by(Attack.src_ip).order_by(func.count(Attack.id).desc()).limit(10)
+            )
+            .group_by(Attack.src_ip)
+            .order_by(func.count(Attack.id).desc())
+            .limit(10)
         )
         rows = result.all()
         if rows:
@@ -133,7 +142,10 @@ async def top_ports(request: Request) -> list[dict]:
             select(
                 Attack.dst_port,
                 func.count(Attack.id).label("count"),
-            ).group_by(Attack.dst_port).order_by(func.count(Attack.id).desc()).limit(10)
+            )
+            .group_by(Attack.dst_port)
+            .order_by(func.count(Attack.id).desc())
+            .limit(10)
         )
         rows = result.all()
         if rows:
@@ -175,10 +187,38 @@ async def model_metrics(request: Request) -> list[dict]:
 
     # Fallback demo data
     return [
-        {"name": "Random Forest", "accuracy": 0.9934, "precision": 0.9892, "recall": 0.9125, "f1_score": 0.9493, "status": "active"},
-        {"name": "Isolation Forest", "accuracy": 0.9412, "precision": 0.6000, "recall": 0.7140, "f1_score": 0.6520, "status": "inactive"},
-        {"name": "Decision Tree", "accuracy": 0.9801, "precision": 0.9710, "recall": 0.8890, "f1_score": 0.9282, "status": "inactive"},
-        {"name": "XGBoost", "accuracy": 0.9956, "precision": 0.9921, "recall": 0.9340, "f1_score": 0.9622, "status": "inactive"},
+        {
+            "name": "Random Forest",
+            "accuracy": 0.9934,
+            "precision": 0.9892,
+            "recall": 0.9125,
+            "f1_score": 0.9493,
+            "status": "active",
+        },
+        {
+            "name": "Isolation Forest",
+            "accuracy": 0.9412,
+            "precision": 0.6000,
+            "recall": 0.7140,
+            "f1_score": 0.6520,
+            "status": "inactive",
+        },
+        {
+            "name": "Decision Tree",
+            "accuracy": 0.9801,
+            "precision": 0.9710,
+            "recall": 0.8890,
+            "f1_score": 0.9282,
+            "status": "inactive",
+        },
+        {
+            "name": "XGBoost",
+            "accuracy": 0.9956,
+            "precision": 0.9921,
+            "recall": 0.9340,
+            "f1_score": 0.9622,
+            "status": "inactive",
+        },
     ]
 
 

@@ -2,20 +2,18 @@
 
 from __future__ import annotations
 
-import uuid
 import random
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Query, Request, UploadFile, File
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 
-from anomaly_detection.db.models import MLModel, ModelStatus, Prediction, Dataset
+from anomaly_detection.db.models import MLModel, ModelStatus, Prediction
 from anomaly_detection.schemas.common import (
     ModelResponse,
-    PredictRequest,
     PredictionResponse,
+    PredictRequest,
     TrainRequest,
 )
 
@@ -32,8 +30,14 @@ async def predict(request: Request, body: PredictRequest) -> dict:
     confidence = random.uniform(0.85, 0.99) if is_anomaly else random.uniform(0.7, 0.95)
 
     attack_types = [
-        "Normal", "DDoS", "DoS", "Port Scan", "Brute Force",
-        "Botnet", "DNS Attack", "SSH Attack"
+        "Normal",
+        "DDoS",
+        "DoS",
+        "Port Scan",
+        "Brute Force",
+        "Botnet",
+        "DNS Attack",
+        "SSH Attack",
     ]
     label = random.choice(attack_types[1:]) if is_anomaly else "Normal"
 
@@ -68,12 +72,14 @@ async def batch_predict(request: Request) -> dict:
     results = []
     for i in range(random.randint(10, 30)):
         is_anomaly = random.random() < 0.2
-        results.append({
-            "row": i + 1,
-            "is_anomaly": is_anomaly,
-            "confidence": round(random.uniform(0.7, 0.99), 4),
-            "label": random.choice(["DDoS", "Port Scan", "Normal", "Brute Force"]),
-        })
+        results.append(
+            {
+                "row": i + 1,
+                "is_anomaly": is_anomaly,
+                "confidence": round(random.uniform(0.7, 0.99), 4),
+                "label": random.choice(["DDoS", "Port Scan", "Normal", "Brute Force"]),
+            }
+        )
 
     anomalies = sum(1 for r in results if r["is_anomaly"])
     return {
@@ -106,20 +112,26 @@ async def train_model(request: Request, body: TrainRequest) -> dict:
 
     # Feature importance (top 10)
     feature_names = [
-        "duration", "src_bytes", "dst_bytes", "count", "srv_count",
-        "serror_rate", "dst_host_count", "dst_host_srv_count",
-        "dst_host_same_srv_rate", "packet_rate", "byte_rate",
-        "flow_duration", "avg_packet_size", "port_entropy",
+        "duration",
+        "src_bytes",
+        "dst_bytes",
+        "count",
+        "srv_count",
+        "serror_rate",
+        "dst_host_count",
+        "dst_host_srv_count",
+        "dst_host_same_srv_rate",
+        "packet_rate",
+        "byte_rate",
+        "flow_duration",
+        "avg_packet_size",
+        "port_entropy",
     ]
-    importance = {
-        f: round(random.uniform(0.01, 0.15), 4) for f in feature_names
-    }
+    importance = {f: round(random.uniform(0.01, 0.15), 4) for f in feature_names}
 
     async with session_factory() as session:
         # Check if model exists
-        result = await session.execute(
-            select(MLModel).where(MLModel.name == body.model_type)
-        )
+        result = await session.execute(select(MLModel).where(MLModel.name == body.model_type))
         existing = result.scalar_one_or_none()
 
         if existing:
@@ -128,7 +140,7 @@ async def train_model(request: Request, body: TrainRequest) -> dict:
             existing.recall = metrics["recall"]
             existing.f1_score = metrics["f1_score"]
             existing.feature_importance = importance
-            existing.trained_at = datetime.now(timezone.utc)
+            existing.trained_at = datetime.now(UTC)
             existing.training_params = body.params
             model_id = existing.id
         else:
@@ -176,14 +188,11 @@ async def list_predictions(
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        total = (
-            await session.execute(select(func.count(Prediction.id)))
-        ).scalar() or 0
+        total = (await session.execute(select(func.count(Prediction.id)))).scalar() or 0
 
         offset = (page - 1) * per_page
         result = await session.execute(
-            select(Prediction).order_by(Prediction.created_at.desc())
-            .offset(offset).limit(per_page)
+            select(Prediction).order_by(Prediction.created_at.desc()).offset(offset).limit(per_page)
         )
         predictions = result.scalars().all()
 
@@ -214,9 +223,7 @@ async def list_models(request: Request) -> list[dict]:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(MLModel).order_by(MLModel.created_at.desc())
-        )
+        result = await session.execute(select(MLModel).order_by(MLModel.created_at.desc()))
         models = result.scalars().all()
         return [
             ModelResponse(
@@ -251,9 +258,7 @@ async def activate_model(request: Request, model_name: str) -> dict:
             m.status = ModelStatus.INACTIVE
 
         # Activate target
-        result = await session.execute(
-            select(MLModel).where(MLModel.name == model_name)
-        )
+        result = await session.execute(select(MLModel).where(MLModel.name == model_name))
         model = result.scalar_one_or_none()
         if not model:
             return JSONResponse(status_code=404, content={"detail": "Model not found"})
@@ -270,9 +275,7 @@ async def feature_importance(request: Request, model_name: str) -> dict:
     session_factory = request.app.state.session_factory
 
     async with session_factory() as session:
-        result = await session.execute(
-            select(MLModel).where(MLModel.name == model_name)
-        )
+        result = await session.execute(select(MLModel).where(MLModel.name == model_name))
         model = result.scalar_one_or_none()
         if not model:
             return JSONResponse(status_code=404, content={"detail": "Model not found"})

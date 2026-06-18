@@ -180,7 +180,9 @@ class ModelResponse(BaseModel):
 
 
 class TrainRequest(BaseModel):
-    model_type: str = Field(..., description="One of: random_forest, isolation_forest, decision_tree, xgboost")
+    model_type: str = Field(
+        ..., description="One of: random_forest, isolation_forest, decision_tree, xgboost"
+    )
     dataset_id: str | None = None
     params: dict[str, Any] | None = None
 

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import random
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,12 +24,10 @@ from anomaly_detection.db.models import (
     AlertStatus,
     Attack,
     Base,
-    BlockedIP,
     MLModel,
     ModelStatus,
     Packet,
     Prediction,
-    Setting,
     SystemLog,
     User,
     UserRole,
@@ -45,8 +43,14 @@ logger = get_logger(__name__)
 
 # Paths that don't require authentication
 _OPEN_PATHS = {
-    "/health", "/ready", "/api/health", "/api/ready", "/api/v1/auth/login", "/api/v1/auth/register",
-    "/api/v1/auth/forgot-password", "/api/v1/auth/refresh",
+    "/health",
+    "/ready",
+    "/api/health",
+    "/api/ready",
+    "/api/v1/auth/login",
+    "/api/v1/auth/register",
+    "/api/v1/auth/forgot-password",
+    "/api/v1/auth/refresh",
     "/api/v1/seed",
 }
 
@@ -66,7 +70,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.session_factory = session_factory
 
     # Create tables
-    from sqlalchemy import inspect as sa_inspect
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -95,9 +98,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.info("default_users_seeded")
 
     # Initialize Inference Service
-    from anomaly_detection.services.inference import InferenceService
     from pathlib import Path
-    
+
+    from anomaly_detection.services.inference import InferenceService
+
     inference_service = InferenceService(
         model_registry_path=Path(settings.model_registry_path),
         data_dir=Path(settings.data_dir),
@@ -127,9 +131,7 @@ def create_app() -> FastAPI:
 
     # JWT Authentication Middleware
     class JWTAuthMiddleware(BaseHTTPMiddleware):
-        async def dispatch(
-            self, request: Request, call_next: RequestResponseEndpoint
-        ) -> Response:
+        async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
             path = request.url.path
 
             # Skip auth for open paths, docs, and static files
@@ -148,7 +150,12 @@ def create_app() -> FastAPI:
                 return await call_next(request)
 
             # Bypass for simulator routes with valid API key
-            is_simulator_route = path in ("/api/v1/flows/stream", "/api/v1/flows/batch", "/simulate", "/api/simulate")
+            is_simulator_route = path in (
+                "/api/v1/flows/stream",
+                "/api/v1/flows/batch",
+                "/simulate",
+                "/api/simulate",
+            )
             has_api_key = request.headers.get("X-API-Key") == settings.simulator_api_key
             if is_simulator_route and has_api_key:
                 return await call_next(request)
@@ -217,15 +224,39 @@ def create_app() -> FastAPI:
         session_factory = app.state.session_factory
 
         async with session_factory() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
 
             # Seed ML Models
             result = await session.execute(select(func.count(MLModel.id)))
             if (result.scalar() or 0) == 0:
                 models_data = [
-                    ("random_forest", "Random Forest", 0.9934, 0.9892, 0.9125, 0.9493, ModelStatus.ACTIVE),
-                    ("isolation_forest", "Isolation Forest", 0.9412, 0.6000, 0.7140, 0.6520, ModelStatus.INACTIVE),
-                    ("decision_tree", "Decision Tree", 0.9801, 0.9710, 0.8890, 0.9282, ModelStatus.INACTIVE),
+                    (
+                        "random_forest",
+                        "Random Forest",
+                        0.9934,
+                        0.9892,
+                        0.9125,
+                        0.9493,
+                        ModelStatus.ACTIVE,
+                    ),
+                    (
+                        "isolation_forest",
+                        "Isolation Forest",
+                        0.9412,
+                        0.6000,
+                        0.7140,
+                        0.6520,
+                        ModelStatus.INACTIVE,
+                    ),
+                    (
+                        "decision_tree",
+                        "Decision Tree",
+                        0.9801,
+                        0.9710,
+                        0.8890,
+                        0.9282,
+                        ModelStatus.INACTIVE,
+                    ),
                     ("xgboost", "XGBoost", 0.9956, 0.9921, 0.9340, 0.9622, ModelStatus.INACTIVE),
                 ]
                 for name, mtype, acc, prec, rec, f1, status in models_data:
@@ -241,39 +272,53 @@ def create_app() -> FastAPI:
                         "byte_rate": round(random.uniform(0.05, 0.12), 4),
                         "port_entropy": round(random.uniform(0.03, 0.09), 4),
                     }
-                    session.add(MLModel(
-                        name=name, model_type=mtype, version="v1",
-                        status=status, accuracy=acc, precision_score=prec,
-                        recall=rec, f1_score=f1, threshold=0.5,
-                        artifact_path=f"models/{name}/v1",
-                        description=f"{mtype} classifier for network anomaly detection",
-                        feature_importance=features,
-                        confusion_matrix={
-                            "true_positive": random.randint(800, 1200),
-                            "false_positive": random.randint(10, 50),
-                            "true_negative": random.randint(3000, 5000),
-                            "false_negative": random.randint(20, 80),
-                        },
-                    ))
+                    session.add(
+                        MLModel(
+                            name=name,
+                            model_type=mtype,
+                            version="v1",
+                            status=status,
+                            accuracy=acc,
+                            precision_score=prec,
+                            recall=rec,
+                            f1_score=f1,
+                            threshold=0.5,
+                            artifact_path=f"models/{name}/v1",
+                            description=f"{mtype} classifier for network anomaly detection",
+                            feature_importance=features,
+                            confusion_matrix={
+                                "true_positive": random.randint(800, 1200),
+                                "false_positive": random.randint(10, 50),
+                                "true_negative": random.randint(3000, 5000),
+                                "false_negative": random.randint(20, 80),
+                            },
+                        )
+                    )
 
             # Seed Packets
             result = await session.execute(select(func.count(Packet.id)))
             if (result.scalar() or 0) < 100:
                 protocols = ["TCP", "UDP", "ICMP", "HTTP", "HTTPS", "DNS", "SSH", "FTP"]
-                for i in range(200):
+                for _ in range(200):
                     ts = now - timedelta(hours=random.randint(0, 168))
-                    session.add(Packet(
-                        timestamp=ts,
-                        src_ip=f"192.168.{random.randint(1, 10)}.{random.randint(1, 254)}",
-                        dst_ip=f"10.0.{random.randint(0, 5)}.{random.randint(1, 254)}",
-                        protocol=random.choice(protocols),
-                        src_port=random.randint(1024, 65535),
-                        dst_port=random.choice([22, 53, 80, 443, 3306, 5432, 8080]),
-                        packet_size=random.randint(40, 1500),
-                        ttl=random.choice([64, 128, 255]),
-                        flags=random.choice(["SYN", "ACK", "SYN-ACK", "FIN", "RST", "PSH-ACK", ""]),
-                        status=random.choices(["Normal", "Suspicious", "Malicious"], weights=[80, 15, 5])[0],
-                    ))
+                    session.add(
+                        Packet(
+                            timestamp=ts,
+                            src_ip=f"192.168.{random.randint(1, 10)}.{random.randint(1, 254)}",
+                            dst_ip=f"10.0.{random.randint(0, 5)}.{random.randint(1, 254)}",
+                            protocol=random.choice(protocols),
+                            src_port=random.randint(1024, 65535),
+                            dst_port=random.choice([22, 53, 80, 443, 3306, 5432, 8080]),
+                            packet_size=random.randint(40, 1500),
+                            ttl=random.choice([64, 128, 255]),
+                            flags=random.choice(
+                                ["SYN", "ACK", "SYN-ACK", "FIN", "RST", "PSH-ACK", ""]
+                            ),
+                            status=random.choices(
+                                ["Normal", "Suspicious", "Malicious"], weights=[80, 15, 5]
+                            )[0],
+                        )
+                    )
 
             # Seed Attacks
             result = await session.execute(select(func.count(Attack.id)))
@@ -281,29 +326,44 @@ def create_app() -> FastAPI:
                 attack_types = [
                     ("DDoS", AlertSeverity.CRITICAL, "Block source IP and enable rate limiting"),
                     ("DoS", AlertSeverity.HIGH, "Enable SYN cookies and rate limit connections"),
-                    ("Port Scan", AlertSeverity.MEDIUM, "Monitor source IP and update firewall rules"),
-                    ("Brute Force", AlertSeverity.HIGH, "Lock account and block IP after 5 failed attempts"),
-                    ("Botnet", AlertSeverity.CRITICAL, "Isolate affected hosts and scan for malware"),
+                    (
+                        "Port Scan",
+                        AlertSeverity.MEDIUM,
+                        "Monitor source IP and update firewall rules",
+                    ),
+                    (
+                        "Brute Force",
+                        AlertSeverity.HIGH,
+                        "Lock account and block IP after 5 failed attempts",
+                    ),
+                    (
+                        "Botnet",
+                        AlertSeverity.CRITICAL,
+                        "Isolate affected hosts and scan for malware",
+                    ),
                     ("ARP Spoofing", AlertSeverity.HIGH, "Enable dynamic ARP inspection"),
                     ("DNS Attack", AlertSeverity.MEDIUM, "Verify DNS responses and enable DNSSEC"),
                     ("ICMP Flood", AlertSeverity.MEDIUM, "Rate limit ICMP traffic at firewall"),
                     ("SSH Attack", AlertSeverity.HIGH, "Disable password auth, use key-based only"),
                     ("FTP Attack", AlertSeverity.MEDIUM, "Disable FTP, switch to SFTP"),
                 ]
-                for i in range(40):
+                for _ in range(40):
                     atype, severity, rec = random.choice(attack_types)
                     ts = now - timedelta(hours=random.randint(0, 168))
-                    session.add(Attack(
-                        attack_type=atype, severity=severity,
-                        confidence=round(random.uniform(0.65, 0.99), 4),
-                        src_ip=f"192.168.{random.randint(1, 20)}.{random.randint(1, 254)}",
-                        dst_ip=f"10.0.{random.randint(0, 5)}.{random.randint(1, 254)}",
-                        src_port=random.randint(1024, 65535),
-                        dst_port=random.choice([22, 53, 80, 443, 3306, 8080]),
-                        protocol=random.choice(["TCP", "UDP", "ICMP"]),
-                        recommendation=rec,
-                        detected_at=ts,
-                    ))
+                    session.add(
+                        Attack(
+                            attack_type=atype,
+                            severity=severity,
+                            confidence=round(random.uniform(0.65, 0.99), 4),
+                            src_ip=f"192.168.{random.randint(1, 20)}.{random.randint(1, 254)}",
+                            dst_ip=f"10.0.{random.randint(0, 5)}.{random.randint(1, 254)}",
+                            src_port=random.randint(1024, 65535),
+                            dst_port=random.choice([22, 53, 80, 443, 3306, 8080]),
+                            protocol=random.choice(["TCP", "UDP", "ICMP"]),
+                            recommendation=rec,
+                            detected_at=ts,
+                        )
+                    )
 
             # Seed Alerts
             result = await session.execute(select(func.count(Alert.id)))
@@ -323,33 +383,39 @@ def create_app() -> FastAPI:
                 for i in range(30):
                     ts = now - timedelta(hours=random.randint(0, 168))
                     sev = random.choice(list(AlertSeverity))
-                    session.add(Alert(
-                        title=random.choice(alert_titles),
-                        description=f"Automated alert #{i+1} triggered by anomaly detection engine",
-                        severity=sev,
-                        status=random.choice(list(AlertStatus)),
-                        source_ip=f"192.168.{random.randint(1, 20)}.{random.randint(1, 254)}",
-                        attack_type=random.choice(["DDoS", "Port Scan", "Brute Force", "DoS", None]),
-                        is_read=random.choice([True, False]),
-                        created_at=ts,
-                    ))
+                    session.add(
+                        Alert(
+                            title=random.choice(alert_titles),
+                            description=f"Automated alert #{i + 1} triggered by anomaly detection engine",
+                            severity=sev,
+                            status=random.choice(list(AlertStatus)),
+                            source_ip=f"192.168.{random.randint(1, 20)}.{random.randint(1, 254)}",
+                            attack_type=random.choice(
+                                ["DDoS", "Port Scan", "Brute Force", "DoS", None]
+                            ),
+                            is_read=random.choice([True, False]),
+                            created_at=ts,
+                        )
+                    )
 
             # Seed Predictions
             result = await session.execute(select(func.count(Prediction.id)))
             if (result.scalar() or 0) < 50:
                 model_names = ["random_forest", "isolation_forest", "decision_tree", "xgboost"]
-                for i in range(100):
+                for _ in range(100):
                     is_anomaly = random.random() < 0.2
                     ts = now - timedelta(hours=random.randint(0, 168))
-                    session.add(Prediction(
-                        model_name=random.choice(model_names),
-                        is_anomaly=is_anomaly,
-                        confidence=round(random.uniform(0.7, 0.99), 4),
-                        prediction_label="Anomaly" if is_anomaly else "Normal",
-                        src_ip=f"192.168.{random.randint(1, 10)}.{random.randint(1, 254)}",
-                        dst_ip=f"10.0.{random.randint(0, 5)}.{random.randint(1, 254)}",
-                        created_at=ts,
-                    ))
+                    session.add(
+                        Prediction(
+                            model_name=random.choice(model_names),
+                            is_anomaly=is_anomaly,
+                            confidence=round(random.uniform(0.7, 0.99), 4),
+                            prediction_label="Anomaly" if is_anomaly else "Normal",
+                            src_ip=f"192.168.{random.randint(1, 10)}.{random.randint(1, 254)}",
+                            dst_ip=f"10.0.{random.randint(0, 5)}.{random.randint(1, 254)}",
+                            created_at=ts,
+                        )
+                    )
 
             # Seed System Logs
             result = await session.execute(select(func.count(SystemLog.id)))

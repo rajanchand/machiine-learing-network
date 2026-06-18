@@ -143,6 +143,7 @@ async def app_client(session_factory) -> AsyncGenerator[AsyncClient, None]:
 
     app.state.inference_service = inference_service
     from anomaly_detection.constants import FEATURE_COLUMNS
+
     app.state.feature_stats = {
         col: {"mean": 0.0, "std": 1.0} for col in FEATURE_COLUMNS
     }
@@ -168,7 +169,9 @@ async def app_client(session_factory) -> AsyncGenerator[AsyncClient, None]:
                     metrics_json={},
                     artifact_path=str(model_path),
                     threshold=inference_service.get_threshold(model_name),
-                    status=ModelStatus.ACTIVE if (model_name == inference_service.active_model_name) else ModelStatus.INACTIVE,
+                    status=ModelStatus.ACTIVE
+                    if (model_name == inference_service.active_model_name)
+                    else ModelStatus.INACTIVE,
                     description=f"Test registered {model_name} v1",
                 )
                 session.add(new_model)

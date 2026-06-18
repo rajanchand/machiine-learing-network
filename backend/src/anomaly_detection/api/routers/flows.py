@@ -14,7 +14,14 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import desc, select
 
-from anomaly_detection.db.models import Alert, AlertSeverity, AlertStatus, Prediction, Packet, Attack
+from anomaly_detection.db.models import (
+    Alert,
+    AlertSeverity,
+    AlertStatus,
+    Attack,
+    Packet,
+    Prediction,
+)
 from anomaly_detection.logging import get_logger
 from anomaly_detection.schemas.common import PredictionResponse
 from anomaly_detection.schemas.flows import BatchFlowRequest, FlowCreate, FlowResponse
@@ -22,6 +29,7 @@ from anomaly_detection.services.inference import InferenceService
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+
     from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = get_logger(__name__)
@@ -35,6 +43,7 @@ _sse_subscribers: list[asyncio.Queue[str]] = []
 
 class StreamEvent(BaseModel):
     """Schema for SSE stream events."""
+
     event_type: str = "flow"
     flow_id: uuid.UUID
     ts: datetime
@@ -94,26 +103,28 @@ async def list_flows(
             select(Packet).order_by(desc(Packet.timestamp)).limit(limit).offset(offset)
         )
         packets = result.scalars().all()
-        
+
         flows = []
         for p in packets:
             # Map protocol string back to int for schema
             proto_num = 6 if p.protocol == "TCP" else 17 if p.protocol == "UDP" else 1
-            flows.append(FlowResponse(
-                id=p.id,
-                ts=p.timestamp,
-                src_ip=p.src_ip,
-                src_port=p.src_port,
-                dst_ip=p.dst_ip,
-                dst_port=p.dst_port,
-                protocol=proto_num,
-                label=p.status,
-                duration=0.0,
-                src_bytes=float(p.packet_size),
-                dst_bytes=0.0,
-                count=1.0,
-                byte_rate=0.0,
-            ))
+            flows.append(
+                FlowResponse(
+                    id=p.id,
+                    ts=p.timestamp,
+                    src_ip=p.src_ip,
+                    src_port=p.src_port,
+                    dst_ip=p.dst_ip,
+                    dst_port=p.dst_port,
+                    protocol=proto_num,
+                    label=p.status,
+                    duration=0.0,
+                    src_bytes=float(p.packet_size),
+                    dst_bytes=0.0,
+                    count=1.0,
+                    byte_rate=0.0,
+                )
+            )
         return flows
 
 
@@ -143,7 +154,11 @@ async def batch_inference(
                 score, is_anomaly, model_name, threshold = 0.0, False, "error", 0.5
 
             # Ground truth override fallback for simulation consistency
-            if flow_create.label and flow_create.label.upper() not in ("BENIGN", "NORMAL", "UNKNOWN"):
+            if flow_create.label and flow_create.label.upper() not in (
+                "BENIGN",
+                "NORMAL",
+                "UNKNOWN",
+            ):
                 is_anomaly = True
                 score = max(score, 0.85)
 
@@ -155,7 +170,13 @@ async def batch_inference(
             )
 
             # Map protocol
-            proto_str = "TCP" if flow_create.protocol == 6 else "UDP" if flow_create.protocol == 17 else "ICMP"
+            proto_str = (
+                "TCP"
+                if flow_create.protocol == 6
+                else "UDP"
+                if flow_create.protocol == 17
+                else "ICMP"
+            )
             status_str = "Malicious" if is_anomaly else "Normal"
 
             packet = Packet(
@@ -240,6 +261,7 @@ async def stream_inference(
 
         # Ground truth override fallback for simulation consistency
         import random
+
         if flow_create.label and flow_create.label.upper() not in ("BENIGN", "NORMAL", "UNKNOWN"):
             is_anomaly = True
             score = max(score, random.uniform(0.75, 0.98))
@@ -253,7 +275,9 @@ async def stream_inference(
         )
 
         # Map protocol
-        proto_str = "TCP" if flow_create.protocol == 6 else "UDP" if flow_create.protocol == 17 else "ICMP"
+        proto_str = (
+            "TCP" if flow_create.protocol == 6 else "UDP" if flow_create.protocol == 17 else "ICMP"
+        )
         status_str = "Malicious" if is_anomaly else "Normal"
 
         packet = Packet(
@@ -297,7 +321,7 @@ async def stream_inference(
                 attack_type=flow_create.label or "Unknown",
             )
             session.add(alert)
-            
+
             attack = Attack(
                 attack_type=flow_create.label or "Unknown",
                 severity=severity,
