@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
 from pathlib import Path
 from typing import AsyncGenerator
 import pytest
@@ -34,7 +33,6 @@ FIXTURE_DIR = _PROJECT_ROOT / "data" / "fixtures"
 FIXTURE_CSV = FIXTURE_DIR / "cicids2017_sample.csv"
 
 
-
 @pytest.fixture
 def fixture_csv_path() -> Path:
     """Path to the fixture CSV for testing."""
@@ -61,7 +59,7 @@ async def db_engine():
     """Create a SQLite in-memory database engine for testing."""
     # Use SQLite + aiosqlite for testing
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    
+
     @event.listens_for(engine.sync_engine, "connect")
     def register_sqlite_functions(dbapi_connection, connection_record):
         # Register custom date_trunc for SQLite minute bucket aggregation
@@ -70,14 +68,15 @@ async def db_engine():
                 return dt_str
             # Truncate to minute 'YYYY-MM-DD HH:MM:00'
             return str(dt_str)[:16] + ":00"
+
         dbapi_connection.create_function("date_trunc", 2, date_trunc)
-    
+
     # Create all tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        
+
     yield engine
-    
+
     await engine.dispose()
 
 
@@ -104,13 +103,13 @@ async def db_session(session_factory) -> AsyncGenerator[AsyncSession, None]:
 async def app_client(session_factory) -> AsyncGenerator[AsyncClient, None]:
     """Provide an HTTPX client pointing to the FastAPI application with mocked DB."""
     app = create_app()
-    
+
     # Disable the real lifespan to prevent it connecting to PostgreSQL
     app.router.lifespan_context = None
-    
+
     # Manually configure state
     app.state.session_factory = session_factory
-    
+
     # Setup test inference service using local registry
     settings = get_settings()
     inference_service = InferenceService(
@@ -118,6 +117,30 @@ async def app_client(session_factory) -> AsyncGenerator[AsyncClient, None]:
         data_dir=settings.data_dir,
     )
     inference_service.load_models()
+
+    # If no models were loaded (e.g. in CI due to gitignored folders), seed with dummy models for testing
+    if not inference_service.available_models:
+        import numpy as np
+
+        class DummyDetector:
+            def __init__(self, name: str) -> None:
+                self.name = name
+
+            def score(self, X: np.ndarray) -> np.ndarray:
+                return np.zeros(X.shape[0])
+
+        for model_name in [
+            "isolation_forest",
+            "autoencoder",
+            "halfspace_trees",
+            "lightgbm_benchmark",
+            "random_forest",
+            "xgboost",
+        ]:
+            inference_service._models[model_name] = DummyDetector(model_name)  # type: ignore[assignment]
+            inference_service._thresholds[model_name] = 0.5
+        inference_service._active_model = "isolation_forest"
+
     app.state.inference_service = inference_service
     app.state.settings = settings
     app.state.metrics_inference_count = 0
@@ -127,6 +150,7 @@ async def app_client(session_factory) -> AsyncGenerator[AsyncClient, None]:
     from anomaly_detection.db.models import MLModel, User
     from anomaly_detection.utils.auth import hash_password
     from sqlalchemy import select
+
     async with session_factory() as session:
         for model_name in inference_service.available_models:
             result = await session.execute(
@@ -144,20 +168,19 @@ async def app_client(session_factory) -> AsyncGenerator[AsyncClient, None]:
                     description=f"Test registered {model_name} v1",
                 )
                 session.add(new_model)
-        
+
         # Seed test user
         result_user = await session.execute(
             select(User).where(User.username == "test_analyst")
         )
         if not result_user.scalar_one_or_none():
             user = User(
-                username="test_analyst",
-                password_hash=hash_password("test_pass")
+                username="test_analyst", password_hash=hash_password("test_pass")
             )
             session.add(user)
-            
+
         await session.commit()
-    
+
     # We use ASGITransport to call FastAPI in-process without spinning up a real server
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -166,6 +189,6 @@ async def app_client(session_factory) -> AsyncGenerator[AsyncClient, None]:
         # Perform session login
         await client.post(
             "/api/v1/auth/login",
-            json={"username": "test_analyst", "password": "test_pass"}
+            json={"username": "test_analyst", "password": "test_pass"},
         )
         yield client
