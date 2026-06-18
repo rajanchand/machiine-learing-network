@@ -5,9 +5,9 @@ from __future__ import annotations
 import os
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from alembic import context
 from anomaly_detection.db.models import Base
 
 # Alembic Config object
@@ -30,11 +30,11 @@ target_metadata = Base.metadata
 
 def include_name(name: str | None, type_: str, parent_names: dict[str, str | None]) -> bool:
     """Filter out TimescaleDB internal indexes from autogenerate."""
-    if type_ == "index" and name is not None:
-        # TimescaleDB creates internal indexes that we don't want Alembic to manage
-        if name.startswith("_timescaledb") or name.endswith("_time_idx"):
-            return False
-    return True
+    return not (
+        type_ == "index"
+        and name is not None
+        and (name.startswith("_timescaledb") or name.endswith("_time_idx"))
+    )
 
 
 def run_migrations_offline() -> None:
