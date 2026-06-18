@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import joblib
 import numpy as np
-from pyod.models.iforest import IForest
+from sklearn.ensemble import IsolationForest
 
 from anomaly_detection.logging import get_logger
 from anomaly_detection.ml.base import AnomalyDetector
@@ -36,11 +36,10 @@ class IsolationForestDetector(AnomalyDetector):
         contamination: float = 0.01,
         random_state: int = SEED,
     ) -> None:
-        self._model = IForest(
+        self._model = IsolationForest(
             n_estimators=n_estimators,
             contamination=contamination,
             random_state=random_state,
-            behaviour="new",
         )
         self._n_estimators = n_estimators
         self._contamination = contamination
@@ -59,8 +58,9 @@ class IsolationForestDetector(AnomalyDetector):
 
     def score(self, X: np.ndarray) -> np.ndarray:
         """Compute anomaly scores (higher = more anomalous)."""
-        # PyOD decision_function returns raw scores; normalise to [0, 1]
-        raw_scores: np.ndarray = self._model.decision_function(X)
+        # Sklearn decision_function returns negative values for anomalies and positive for inliers.
+        # We negate it so higher values mean more anomalous.
+        raw_scores: np.ndarray = -self._model.decision_function(X)
         # Shift and scale to approximate [0, 1] range
         min_score = raw_scores.min()
         max_score = raw_scores.max()

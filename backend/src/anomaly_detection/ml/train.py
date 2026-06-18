@@ -18,10 +18,8 @@ import pandas as pd
 
 from anomaly_detection.constants import FEATURE_COLUMNS
 from anomaly_detection.logging import get_logger, setup_logging
-from anomaly_detection.ml.autoencoder import AutoEncoderDetector
-from anomaly_detection.ml.halfspace_trees import HalfSpaceTreesDetector
+from anomaly_detection.ml.decision_tree import DecisionTreeDetector
 from anomaly_detection.ml.isolation_forest import IsolationForestDetector
-from anomaly_detection.ml.lightgbm_model import LightGBMBenchmark
 from anomaly_detection.ml.random_forest import RandomForestDetector
 from anomaly_detection.ml.xgboost_model import XGBoostDetector
 
@@ -63,35 +61,19 @@ def train_all_models(data_dir: Path, output_dir: Path) -> None:
     iforest.fit(X_benign)
     iforest.save(output_dir / "isolation_forest" / "v1")
 
-    # --- 2. AutoEncoder ---
-    logger.info("training_model", model="autoencoder")
-    autoencoder = AutoEncoderDetector(
-        hidden_neurons=[64, 32, 16, 32, 64],
-        epochs=50,
-        batch_size=64,
-    )
-    autoencoder.fit(X_benign)
-    autoencoder.save(output_dir / "autoencoder" / "v1")
+    # --- 2. Decision Tree (supervised) ---
+    logger.info("training_model", model="decision_tree")
+    dt = DecisionTreeDetector(max_depth=10)
+    dt.fit(X_full, y_full)
+    dt.save(output_dir / "decision_tree" / "v1")
 
-    # --- 3. HalfSpaceTrees ---
-    logger.info("training_model", model="halfspace_trees")
-    hst = HalfSpaceTreesDetector(n_trees=25, height=8, window_size=250)
-    hst.fit(X_benign)
-    hst.save(output_dir / "halfspace_trees" / "v1")
-
-    # --- 4. LightGBM Benchmark (supervised) ---
-    logger.info("training_model", model="lightgbm_benchmark")
-    lgbm = LightGBMBenchmark(n_estimators=200, max_depth=8)
-    lgbm.fit(X_full, y_full)
-    lgbm.save(output_dir / "lightgbm_benchmark" / "v1")
-
-    # --- 5. Random Forest (supervised) ---
+    # --- 3. Random Forest (supervised) ---
     logger.info("training_model", model="random_forest")
     rf = RandomForestDetector(n_estimators=200, max_depth=10)
     rf.fit(X_full, y_full)
     rf.save(output_dir / "random_forest" / "v1")
 
-    # --- 6. XGBoost (supervised) ---
+    # --- 4. XGBoost (supervised) ---
     logger.info("training_model", model="xgboost")
     xgb_model = XGBoostDetector(n_estimators=200, max_depth=6, learning_rate=0.1)
     xgb_model.fit(X_full, y_full)

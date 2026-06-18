@@ -4,34 +4,49 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "anomaly-detection"
-version = "0.1.0"
-description = "Network anomaly detection system using ML models on CICIDS2017 data"
+version = "1.0.0"
+description = "ML-Based Network Anomaly Detection System — MSc Dissertation Project"
 requires-python = ">=3.12"
 dependencies = [
+    # Web framework
     "fastapi>=0.135.0",
     "uvicorn[standard]>=0.34.0",
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
+    "python-multipart>=0.0.18",
+
+    # Database
     "sqlalchemy[asyncio]>=2.0.36",
     "asyncpg>=0.30.0",
     "psycopg2-binary>=2.9.10",
     "alembic>=1.14",
+
+    # Authentication & Security
+    "PyJWT>=2.9.0",
+    "bcrypt>=4.2.0",
+
+    # Data processing
     "pandas>=2.2",
     "pyarrow>=18.0",
     "numpy>=2.1",
+
+    # Machine Learning
     "scikit-learn>=1.6",
-    "pyod>=2.0",
-    "torch>=2.0",
-    "tqdm>=4.0",
-    "river>=0.21",
-    "lightgbm>=4.5",
     "xgboost>=2.0",
     "joblib>=1.4",
+
+    # Packet capture
+    "scapy>=2.6.0",
+
+    # Report generation
+    "reportlab>=4.2",
+    "openpyxl>=3.1",
+
+    # Logging & utilities
     "structlog>=24.4",
-    "matplotlib>=3.9",
     "httpx>=0.28",
-    "itsdangerous>=2.2.0",
     "aiosqlite>=0.20.0",
+    "psutil>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -61,17 +76,13 @@ select = [
     "UP",   # pyupgrade
     "B",    # flake8-bugbear
     "SIM",  # flake8-simplify
-    "TCH",  # flake8-type-checking
     "RUF",  # ruff-specific
 ]
 ignore = [
     "N803",  # Argument name should be lowercase (allow uppercase X/Y for ML convention)
     "N806",  # Variable name should be lowercase (allow uppercase X/Y for ML convention)
-    "B904",  # Use raise from within except blocks (not critical for exception handlers here)
+    "B904",  # Use raise from within except blocks
     "E501",  # Line too long
-    "TC001", # Move application import into a type-checking block
-    "TC002", # Move third-party import into a type-checking block
-    "TC003", # Move standard library import into a type-checking block
 ]
 
 [tool.mypy]
@@ -79,17 +90,17 @@ python_version = "3.12"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
-plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = [
-    "pyod.*",
-    "river.*",
-    "lightgbm.*",
     "joblib.*",
     "pandas.*",
     "sklearn.*",
-    "matplotlib.*",
+    "xgboost.*",
+    "scapy.*",
+    "reportlab.*",
+    "openpyxl.*",
+    "psutil.*",
 ]
 ignore_missing_imports = true
 

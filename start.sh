@@ -46,7 +46,7 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Start Backend
-echo "🚀 Starting Backend API on http://localhost:8000..."
+echo "🚀 Starting Backend API & Dashboard on http://localhost:8000..."
 echo "Logs redirected to $BACKEND_LOG"
 backend/.venv/bin/python -m uvicorn anomaly_detection.app:create_app --factory --host 0.0.0.0 --port 8000 > "$BACKEND_LOG" 2>&1 &
 BACKEND_PID=$!
@@ -73,19 +73,11 @@ PYTHONPATH=src ../backend/.venv/bin/python -u -m simulator.replay > "../$SIMULAT
 SIMULATOR_PID=$!
 cd ..
 
-# Start Frontend
-echo "🚀 Starting Frontend Dev Server..."
-echo "Logs redirected to $FRONTEND_LOG"
-cd frontend
-npm run dev > "../$FRONTEND_LOG" 2>&1 &
-FRONTEND_PID=$!
-cd ..
-
 echo "=================================================================="
 echo "🎉 System is running!"
 echo "=================================================================="
-echo "Dashboard: http://localhost:5173/ (or next available port)"
-echo "Backend API: http://localhost:8000/docs"
+echo "Dashboard & API: http://localhost:8000/"
+echo "Interactive API Docs: http://localhost:8000/docs"
 echo "Press Ctrl+C to stop all services."
 echo "=================================================================="
 

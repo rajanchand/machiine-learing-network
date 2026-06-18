@@ -151,8 +151,8 @@ async def app_client(session_factory) -> AsyncGenerator[AsyncClient, None]:
     app.state.metrics_inference_sum = 0.0
 
     # Register models in database for list_models test if not already present
-    from anomaly_detection.db.models import MLModel, User
-    from anomaly_detection.utils.auth import hash_password
+    from anomaly_detection.db.models import MLModel, User, ModelStatus
+    from anomaly_detection.authentication import hash_password
     from sqlalchemy import select
 
     async with session_factory() as session:
@@ -168,7 +168,7 @@ async def app_client(session_factory) -> AsyncGenerator[AsyncClient, None]:
                     metrics_json={},
                     artifact_path=str(model_path),
                     threshold=inference_service.get_threshold(model_name),
-                    is_active=(model_name == inference_service.active_model_name),
+                    status=ModelStatus.ACTIVE if (model_name == inference_service.active_model_name) else ModelStatus.INACTIVE,
                     description=f"Test registered {model_name} v1",
                 )
                 session.add(new_model)
@@ -179,7 +179,9 @@ async def app_client(session_factory) -> AsyncGenerator[AsyncClient, None]:
         )
         if not result_user.scalar_one_or_none():
             user = User(
-                username="test_analyst", password_hash=hash_password("test_pass")
+                username="test_analyst",
+                email="test_analyst@anomalyguard.local",
+                password_hash=hash_password("test_pass"),
             )
             session.add(user)
 
@@ -191,8 +193,11 @@ async def app_client(session_factory) -> AsyncGenerator[AsyncClient, None]:
         base_url="http://testserver",
     ) as client:
         # Perform session login
-        await client.post(
+        login_res = await client.post(
             "/api/v1/auth/login",
             json={"username": "test_analyst", "password": "test_pass"},
         )
+        if login_res.status_code == 200:
+            token = login_res.json()["access_token"]
+            client.headers["Authorization"] = f"Bearer {token}"
         yield client

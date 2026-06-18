@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AnomalyGuard Datasets — Upload and manage training datasets">
+    <title>Datasets — AnomalyGuard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+    <style>
+        .upload-zone {
+            border: 2px dashed var(--border-strong);
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            background: var(--surface);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+        .upload-zone i {
+            font-size: 32px;
+            color: var(--primary);
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper" id="app">
+        <div class="main-content">
+            <!-- Topbar injected by JS -->
+            <div class="page-content">
+                <div class="breadcrumb-nav"><a href="dashboard.html">Home</a> / Datasets</div>
+                
+                <div class="page-header">
+                    <h2>Dataset Management</h2>
+                </div>
+
+                <div class="row g-4">
+                    <!-- Column 1: Upload Zone -->
+                    <div class="col-lg-4">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0"><i class="fas fa-cloud-upload-alt me-2 text-primary"></i>Upload Dataset</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                                    <i class="fas fa-file-csv"></i>
+                                    <p class="mb-1 fw-600">Drag & drop your CSV file here</p>
+                                    <p class="text-muted small mb-3">or click to browse from your computer</p>
+                                    <span class="btn btn-sm btn-outline-primary">Select File</span>
+                                    <input type="file" id="fileInput" accept=".csv" style="display: none;" onchange="handleFileSelect(event)">
+                                </div>
+                                <div id="uploadProgress" class="mt-3" style="display: none;">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <small class="fw-600 text-primary" id="progressStatus">Uploading...</small>
+                                        <small id="progressPercent">0%</small>
+                                    </div>
+                                    <div class="progress">
+                                        <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated" id="progressBar" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0"><i class="fas fa-info-circle me-2 text-primary"></i>Dataset Guidelines</h5>
+                            </div>
+                            <div class="card-body">
+                                <ul class="mb-0 ps-3 small text-secondary">
+                                    <li class="mb-2">Only <strong>CSV</strong> format is supported.</li>
+                                    <li class="mb-2">Columns should correspond to network flow features (duration, packets, bytes, etc.).</li>
+                                    <li class="mb-2">Make sure row count does not exceed 100,000 for faster training in local environments.</li>
+                                    <li>Missing values will be automatically cleaned/imputed during model training.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Column 2: Datasets List -->
+                    <div class="col-lg-8">
+                        <div class="table-container">
+                            <div class="table-header">
+                                <h5><i class="fas fa-database me-2 text-primary"></i>Uploaded Datasets</h5>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="loadDatasets()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Dataset Name</th>
+                                            <th>File Size</th>
+                                            <th>Rows</th>
+                                            <th>Columns</th>
+                                            <th>Uploaded At</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="datasetsList">
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted py-5">
+                                                <i class="fas fa-circle-notch fa-spin fa-2x mb-3 text-faint"></i>
+                                                <p class="mb-0">Loading datasets...</p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="previewTitle">Dataset Preview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <span class="badge bg-primary me-2" id="previewRows">0 Rows</span>
+                        <span class="badge bg-secondary" id="previewCols">0 Columns</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered table-striped" id="previewTable">
+                            <thead><tr id="previewTableHead"></tr></thead>
+                            <tbody id="previewTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/common.js"></script>
+    <script>
+        // Initialize layout
+        if (!initPageLayout('datasets', 'Datasets')) throw new Error('Auth required');
+
+        let previewModal;
+        document.addEventListener('DOMContentLoaded', () => {
+            previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+            
+            // Drag and drop events
+            const zone = document.getElementById('uploadZone');
+            ['dragenter', 'dragover'].forEach(name => {
+                zone.addEventListener(name, (e) => {
+                    e.preventDefault();
+                    zone.classList.add('dragover');
+                }, false);
+            });
+            ['dragleave', 'drop'].forEach(name => {
+                zone.addEventListener(name, (e) => {
+                    e.preventDefault();
+                    zone.classList.remove('dragover');
+                }, false);
+            });
+            zone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length > 0) {
+                    uploadFile(files[0]);
+                }
+            });
+        });
+
+        async function loadDatasets() {
+            const list = document.getElementById('datasetsList');
+            try {
+                const datasets = await API.getDatasets();
+                if (datasets && datasets.length > 0) {
+                    list.innerHTML = datasets.map(d => `
+                        <tr>
+                            <td class="fw-600">${d.name}</td>
+                            <td>${formatFileSize(d.file_size)}</td>
+                            <td>${formatNumber(d.row_count)}</td>
+                            <td>${d.column_count}</td>
+                            <td>${formatDateTime(d.created_at)}</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-info me-1" onclick="previewDataset('${d.id}')" title="Preview">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <a href="${API.BASE}/api/v1/datasets/${d.id}/download" class="btn btn-sm btn-outline-primary me-1" title="Download">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteDataset('${d.id}')" title="Delete">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    list.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-5">No datasets found. Upload a CSV to get started!</td></tr>`;
+                }
+            } catch (error) {
+                list.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-5">Error loading datasets. Please try again.</td></tr>`;
+            }
+        }
+
+        async function handleFileSelect(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                uploadFile(files[0]);
+            }
+        }
+
+        async function uploadFile(file) {
+            if (!file.name.endsWith('.csv')) {
+                showToast('Only CSV files are supported.', 'error');
+                return;
+            }
+
+            const progress = document.getElementById('uploadProgress');
+            const bar = document.getElementById('progressBar');
+            const percent = document.getElementById('progressPercent');
+            const status = document.getElementById('progressStatus');
+
+            progress.style.display = 'block';
+            bar.style.width = '20%';
+            percent.textContent = '20%';
+            status.textContent = 'Parsing and uploading...';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await API.upload('/api/v1/datasets/upload', formData);
+                if (res) {
+                    bar.style.width = '100%';
+                    percent.textContent = '100%';
+                    status.textContent = 'Upload complete!';
+                    showToast('Dataset uploaded and processed successfully!');
+                    setTimeout(() => {
+                        progress.style.display = 'none';
+                        loadDatasets();
+                    }, 1000);
+                } else {
+                    showToast('Failed to upload dataset', 'error');
+                    progress.style.display = 'none';
+                }
+            } catch (error) {
+                showToast('Upload failed', 'error');
+                progress.style.display = 'none';
+            }
+        }
+
+        async function previewDataset(id) {
+            try {
+                const details = await API.getDataset(id);
+                if (details) {
+                    document.getElementById('previewTitle').textContent = `Preview — ${details.filename}`;
+                    document.getElementById('previewRows').textContent = `${formatNumber(details.row_count)} Total Rows`;
+                    document.getElementById('previewCols').textContent = `${details.column_count} Columns`;
+
+                    // Render table headers
+                    const headers = details.columns || [];
+                    const headRow = document.getElementById('previewTableHead');
+                    headRow.innerHTML = headers.map(h => `<th>${h}</th>`).join('');
+
+                    // Render table body
+                    const preview = details.preview || [];
+                    const body = document.getElementById('previewTableBody');
+                    if (preview.length > 0) {
+                        body.innerHTML = preview.map(row => `
+                            <tr>
+                                ${headers.map(h => `<td>${row[h] !== undefined ? row[h] : ''}</td>`).join('')}
+                            </tr>
+                        `).join('');
+                    } else {
+                        body.innerHTML = `<tr><td colspan="${headers.length}" class="text-center text-muted">No preview rows available.</td></tr>`;
+                    }
+
+                    previewModal.show();
+                } else {
+                    showToast('Failed to fetch dataset details', 'error');
+                }
+            } catch (err) {
+                showToast('Error displaying dataset preview', 'error');
+            }
+        }
+
+        async function deleteDataset(id) {
+            if (confirm('Are you sure you want to delete this dataset? This will also remove the physical file.')) {
+                const res = await API.deleteDataset(id);
+                if (res) {
+                    showToast('Dataset deleted successfully');
+                    loadDatasets();
+                } else {
+                    showToast('Failed to delete dataset', 'error');
+                }
+            }
+        }
+
+        // Initial load
+        loadDatasets();
+    </script>
+</body>
+</html>

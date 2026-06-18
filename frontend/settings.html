@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AnomalyGuard Settings — Configure system and notification settings">
+    <title>Settings — AnomalyGuard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-wrapper" id="app">
+        <div class="main-content">
+            <!-- Topbar injected by JS -->
+            <div class="page-content">
+                <div class="breadcrumb-nav"><a href="dashboard.html">Home</a> / Settings</div>
+                
+                <div class="page-header">
+                    <h2>System Settings</h2>
+                </div>
+
+                <div class="row g-4">
+                    <!-- Column 1: Configuration forms -->
+                    <div class="col-lg-8">
+                        <!-- System settings form -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0"><i class="fas fa-sliders-h me-2 text-primary"></i>General System Configuration</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="settingsForm">
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label for="settingRefreshInterval" class="form-label fw-600">Dashboard Refresh Interval (Seconds)</label>
+                                            <input type="number" class="form-control" id="settingRefreshInterval" min="5" max="300" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="settingAlertThreshold" class="form-label fw-600">Alert Confidence Threshold</label>
+                                            <input type="number" class="form-control" id="settingAlertThreshold" min="0.1" max="1.0" step="0.05" required>
+                                        </div>
+                                    </div>
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label for="settingMaxCapture" class="form-label fw-600">Max Packets Per Capture Session</label>
+                                            <input type="number" class="form-control" id="settingMaxCapture" min="100" max="100000" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="settingBaseUrl" class="form-label fw-600">Primary API Base URL</label>
+                                            <input type="url" class="form-control" id="settingBaseUrl" required>
+                                        </div>
+                                    </div>
+
+                                    <hr class="my-4">
+                                    <h6 class="fw-600 mb-3 text-secondary">Notification Settings</h6>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="settingEmailNotif">
+                                        <label class="form-check-label fw-600" for="settingEmailNotif">
+                                            Enable Email Alerts
+                                        </label>
+                                        <div class="form-text mt-0">Sends automated emails to administrators when a Critical severity alert is raised.</div>
+                                    </div>
+
+                                    <div class="form-check mb-4">
+                                        <input class="form-check-input" type="checkbox" id="settingBrowserNotif">
+                                        <label class="form-check-label fw-600" for="settingBrowserNotif">
+                                            Enable Browser Push Notifications
+                                        </label>
+                                        <div class="form-text mt-0">Triggers real-time browser notifications for warning and critical logs.</div>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary px-4 py-2">
+                                        <i class="fas fa-save me-2"></i> Save Configurations
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Change password card -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0"><i class="fas fa-key me-2 text-primary"></i>Update Account Password</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="passwordForm">
+                                    <div class="mb-3">
+                                        <label for="currentPassword" class="form-label fw-600">Current Password</label>
+                                        <input type="password" class="form-control" id="currentPassword" required>
+                                    </div>
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label for="newPassword" class="form-label fw-600">New Password</label>
+                                            <input type="password" class="form-control" id="newPassword" required minlength="6">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="confirmNewPassword" class="form-label fw-600">Confirm New Password</label>
+                                            <input type="password" class="form-control" id="confirmNewPassword" required minlength="6">
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-outline-danger px-4 py-2">
+                                        <i class="fas fa-shield-alt me-2"></i> Change Password
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Column 2: Diagnostic & API cards -->
+                    <div class="col-lg-4">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0"><i class="fas fa-server me-2 text-primary"></i>System Diagnostics</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="list-group list-group-flush">
+                                    <div class="list-group-item px-0">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <small class="text-muted fw-600">Environment</small>
+                                            <span class="badge bg-secondary text-uppercase" id="diagEnv">—</span>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item px-0">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <small class="text-muted fw-600">API Endpoint</small>
+                                            <span class="text-mono" id="diagUrl">—</span>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item px-0">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <small class="text-muted fw-600">API Version</small>
+                                            <span class="text-mono" id="diagVersion">v1.0.0</span>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item px-0">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <small class="text-muted fw-600">Token Algorithm</small>
+                                            <span class="text-mono" id="diagAlgorithm">—</span>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item px-0">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <small class="text-muted fw-600">Token Expiry</small>
+                                            <span id="diagExpiry">—</span>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item px-0">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <small class="text-muted fw-600">Login Rate Limit</small>
+                                            <span id="diagRateLimit">—</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/common.js"></script>
+    <script>
+        // Initialize layout
+        if (!initPageLayout('settings', 'Settings')) throw new Error('Auth required');
+
+        async function loadSettings() {
+            // Load key-value settings from server
+            const settings = await API.getSettings();
+            if (settings) {
+                // Settings mapping
+                const refreshInt = settings.find(s => s.key === 'refresh_interval');
+                const threshold = settings.find(s => s.key === 'alert_threshold');
+                const maxCap = settings.find(s => s.key === 'max_packet_capture');
+                const apiBase = settings.find(s => s.key === 'api_url');
+                const emailNotif = settings.find(s => s.key === 'notification_email');
+                const browserNotif = settings.find(s => s.key === 'notification_browser');
+
+                if (refreshInt) document.getElementById('settingRefreshInterval').value = refreshInt.value;
+                if (threshold) document.getElementById('settingAlertThreshold').value = threshold.value;
+                if (maxCap) document.getElementById('settingMaxCapture').value = maxCap.value;
+                if (apiBase) document.getElementById('settingBaseUrl').value = apiBase.value;
+
+                if (emailNotif) document.getElementById('settingEmailNotif').checked = (emailNotif.value === 'true');
+                if (browserNotif) document.getElementById('settingBrowserNotif').checked = (browserNotif.value === 'true');
+            }
+
+            // Load diagnostic metrics
+            const diag = await API.getAPISettings();
+            if (diag) {
+                document.getElementById('diagEnv').textContent = diag.environment || 'production';
+                document.getElementById('diagUrl').textContent = diag.api_url || 'http://localhost:8000';
+                document.getElementById('diagAlgorithm').textContent = diag.jwt_algorithm || 'HS256';
+                document.getElementById('diagExpiry').textContent = `${diag.jwt_expiry_minutes || 60} minutes`;
+                document.getElementById('diagRateLimit').textContent = diag.rate_limit || '10/minute';
+            }
+        }
+
+        document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const config = {
+                refresh_interval: document.getElementById('settingRefreshInterval').value,
+                alert_threshold: document.getElementById('settingAlertThreshold').value,
+                max_packet_capture: document.getElementById('settingMaxCapture').value,
+                api_url: document.getElementById('settingBaseUrl').value,
+                notification_email: document.getElementById('settingEmailNotif').checked ? 'true' : 'false',
+                notification_browser: document.getElementById('settingBrowserNotif').checked ? 'true' : 'false'
+            };
+
+            const res = await API.updateSettings(config);
+            if (res) {
+                showToast('Configurations saved successfully!');
+                loadSettings();
+            } else {
+                showToast('Failed to update system configurations.', 'error');
+            }
+        });
+
+        document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const current = document.getElementById('currentPassword').value;
+            const newPass = document.getElementById('newPassword').value;
+            const confirm = document.getElementById('confirmNewPassword').value;
+
+            if (newPass !== confirm) {
+                showToast('New passwords do not match.', 'error');
+                return;
+            }
+
+            const res = await API.changePassword(current, newPass);
+            if (res) {
+                showToast('Password changed successfully!');
+                document.getElementById('passwordForm').reset();
+            } else {
+                showToast('Failed to change password. Make sure current password is correct.', 'error');
+            }
+        });
+
+        // Initial load
+        loadSettings();
+    </script>
+</body>
+</html>

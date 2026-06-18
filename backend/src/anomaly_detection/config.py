@@ -35,9 +35,18 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     log_level: str = "INFO"
-    cors_origins: list[str] = ["http://localhost:5173"]
+    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:8000"]
 
-    # Security — SESSION_SECRET_KEY must be set in production
+    # JWT Authentication
+    jwt_secret_key: str = Field(
+        default="dev-jwt-secret-change-in-production-min-32-characters-long",
+        min_length=32,
+    )
+    jwt_algorithm: str = "HS256"
+    jwt_expiry_minutes: int = 60
+    jwt_refresh_expiry_days: int = 7
+
+    # Security
     session_secret_key: str = Field(
         default="dev-only-secret-change-in-production-min-32-chars",
         min_length=32,
@@ -50,17 +59,27 @@ class Settings(BaseSettings):
     login_rate_limit: int = 10  # max login attempts per minute per IP
     batch_max_size: int = 500  # max flows per batch request
 
-    # Model registry and data paths
-    model_registry_path: Path = Path("/app/models")
-    data_dir: Path = Path("/app/data")
+    # File paths
+    model_registry_path: Path = Path("models")
+    data_dir: Path = Path("data")
+    upload_dir: Path = Path("uploads")
+    reports_dir: Path = Path("reports")
+    frontend_dir: Path = Path("frontend")
 
-    # Evaluated thresholds at ~1% FPR (fallback if not in metrics.json)
+    # ML defaults
     default_thresholds: dict[str, float] = {
-        "autoencoder": 0.0035,
         "isolation_forest": 0.39,
-        "halfspace_trees": 0.976,
-        "lightgbm_benchmark": 0.56,
+        "random_forest": 0.5,
+        "xgboost": 0.5,
+        "decision_tree": 0.5,
     }
+
+    # Email (optional)
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str = "noreply@anomalyguard.local"
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -78,11 +97,17 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def ensure_directories_exist(self) -> Settings:
-        for path in (self.model_registry_path, self.data_dir):
+        for path in (
+            self.model_registry_path,
+            self.data_dir,
+            self.upload_dir,
+            self.reports_dir,
+        ):
             with contextlib.suppress(OSError, PermissionError):
                 path.mkdir(parents=True, exist_ok=True)
         return self
 
 
 def get_settings() -> Settings:
+    """Factory function to create Settings instance."""
     return Settings()

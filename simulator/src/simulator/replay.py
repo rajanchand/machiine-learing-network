@@ -16,6 +16,7 @@ import signal
 from datetime import datetime, timezone
 from pathlib import Path
 
+import logging
 import httpx
 import pandas as pd
 import structlog
@@ -23,6 +24,8 @@ import structlog
 from typing import Any
 
 from simulator.config import get_simulator_settings
+
+logging.basicConfig(level=logging.INFO)
 
 structlog.configure(
     processors=[

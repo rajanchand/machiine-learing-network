@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Monitoring — AnomalyGuard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-wrapper" id="app"><div class="main-content">
+    <div class="page-content">
+        <div class="breadcrumb-nav"><a href="dashboard.html">Home</a> / Live Monitoring</div>
+        <div class="page-header"><h2>Live Network Monitoring</h2>
+            <div class="d-flex gap-2">
+                <select class="form-select form-select-sm" id="ifaceSelect" style="width:160px"><option>eth0</option></select>
+                <button class="btn btn-success btn-sm" id="startBtn" onclick="startMon()"><i class="fas fa-play me-1"></i>Start</button>
+                <button class="btn btn-danger btn-sm" id="stopBtn" onclick="stopMon()" disabled><i class="fas fa-stop me-1"></i>Stop</button>
+                <div class="form-check form-switch ms-2 d-flex align-items-center"><input class="form-check-input" type="checkbox" id="autoRefresh" checked><label class="form-check-label ms-1" for="autoRefresh" style="font-size:12px">Auto Refresh</label></div>
+            </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="row g-3 mb-3">
+            <div class="col-md-3"><div class="stat-card"><div class="stat-card-label">Live Packet Counter</div><div class="stat-card-value" id="pktCount">0</div></div></div>
+            <div class="col-md-3"><div class="stat-card success"><div class="stat-card-label">Incoming Traffic</div><div class="stat-card-value" id="inTraffic">0 MB/s</div></div></div>
+            <div class="col-md-3"><div class="stat-card info"><div class="stat-card-label">Outgoing Traffic</div><div class="stat-card-value" id="outTraffic">0 MB/s</div></div></div>
+            <div class="col-md-3"><div class="stat-card warning"><div class="stat-card-label">Connection Status</div><div class="stat-card-value" id="connStatus"><span class="status-dot red"></span> Disconnected</div></div></div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <div class="stat-card"><div class="stat-card-label">Bandwidth Usage</div>
+                    <div class="progress mt-2" style="height:12px"><div class="progress-bar bg-primary" id="bwBar" style="width:0%"></div></div>
+                    <div class="stat-card-sub mt-1" id="bwLabel">0%</div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-card"><div class="chart-card-header"><h5>Protocol Statistics</h5></div>
+                    <div class="chart-card-body"><table class="table table-sm mb-0"><thead><tr><th>Protocol</th><th>Packets</th></tr></thead><tbody id="protoStats"><tr><td colspan="2" class="text-muted text-center">Start monitoring to see data</td></tr></tbody></table></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Feed -->
+        <div class="table-container">
+            <div class="table-header"><h5><i class="fas fa-stream me-2"></i>Live Packet Stream</h5></div>
+            <div class="table-responsive" style="max-height:400px;overflow-y:auto">
+                <table class="table table-hover table-sm mb-0"><thead><tr><th>#</th><th>Time</th><th>Source</th><th>Destination</th><th>Protocol</th><th>Size</th><th>Status</th></tr></thead>
+                <tbody id="liveStream"><tr><td colspan="7" class="text-center text-muted py-4">Start monitoring to see live packets</td></tr></tbody></table>
+            </div>
+        </div>
+    </div>
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/auth.js"></script><script src="js/api.js"></script><script src="js/common.js"></script>
+<script>
+    if (!initPageLayout('monitoring', 'Live Monitoring')) throw new Error('Auth');
+
+    let eventSource = null;
+    let packetCount = 0;
+
+    // Load interfaces
+    API.getInterfaces().then(ifaces => {
+        if (ifaces) {
+            const sel = document.getElementById('ifaceSelect');
+            sel.innerHTML = ifaces.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
+        }
+    });
+
+    async function startMon() {
+        const iface = document.getElementById('ifaceSelect').value;
+        await API.startMonitoring(iface);
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = false;
+        document.getElementById('connStatus').innerHTML = '<span class="status-dot green"></span> Connected';
+        document.getElementById('liveStream').innerHTML = '';
+        packetCount = 0;
+
+        // Open SSE
+        const token = AUTH.getToken();
+        eventSource = new EventSource(`/api/v1/monitoring/feed`);
+        eventSource.onmessage = (e) => {
+            const pkt = JSON.parse(e.data);
+            if (pkt.status === 'paused') return;
+            packetCount++;
+            document.getElementById('pktCount').textContent = formatNumber(packetCount);
+            const tbody = document.getElementById('liveStream');
+            const row = document.createElement('tr');
+            row.innerHTML = `<td>${pkt.id}</td><td class="text-mono">${new Date(pkt.timestamp).toLocaleTimeString()}</td>
+                <td class="text-mono">${pkt.src_ip}:${pkt.src_port}</td><td class="text-mono">${pkt.dst_ip}:${pkt.dst_port}</td>
+                <td><span class="badge bg-secondary">${pkt.protocol}</span></td><td>${pkt.size} B</td>
+                <td><span class="badge-severity badge-${pkt.status.toLowerCase()}">${pkt.status}</span></td>`;
+            tbody.prepend(row);
+            if (tbody.children.length > 100) tbody.lastChild.remove();
+        };
+
+        // Poll stats
+        refreshStats();
+    }
+
+    async function stopMon() {
+        await API.stopMonitoring();
+        if (eventSource) { eventSource.close(); eventSource = null; }
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('stopBtn').disabled = true;
+        document.getElementById('connStatus').innerHTML = '<span class="status-dot red"></span> Disconnected';
+    }
+
+    async function refreshStats() {
+        if (!document.getElementById('stopBtn').disabled) return; // Not running
+        const stats = await API.getMonitoringStats();
+        if (stats) {
+            document.getElementById('inTraffic').textContent = stats.incoming_traffic;
+            document.getElementById('outTraffic').textContent = stats.outgoing_traffic;
+            document.getElementById('bwBar').style.width = stats.bandwidth_usage + '%';
+            document.getElementById('bwLabel').textContent = formatPercent(stats.bandwidth_usage);
+            const protoBody = document.getElementById('protoStats');
+            protoBody.innerHTML = Object.entries(stats.protocol_stats).map(([p,c]) =>
+                `<tr><td>${p}</td><td>${formatNumber(c)}</td></tr>`
+            ).join('');
+        }
+    }
+
+    setInterval(() => {
+        if (document.getElementById('autoRefresh').checked && !document.getElementById('stopBtn').disabled === false) {
+            refreshStats();
+        }
+    }, 3000);
+</script>
+</body></html>

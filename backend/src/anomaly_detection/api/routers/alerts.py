@@ -1,308 +1,156 @@
-"""Alert API routers — list, detail, status updates, feedback, and CSV export."""
+"""Alerts router — list, filter, update, resolve alerts."""
 
 from __future__ import annotations
 
-import csv
-import io
-import uuid
-from datetime import UTC, datetime
-from enum import StrEnum
-from typing import TYPE_CHECKING, cast
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from sqlalchemy import desc, select
-from sqlalchemy.orm import selectinload
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import JSONResponse
+from sqlalchemy import func, select
 
-from anomaly_detection.constants import FEATURE_COLUMNS
-from anomaly_detection.db.models import Alert, AlertStatus, Feedback, Flow
-from anomaly_detection.schemas.common import (
-    AlertDetailResponse,
-    AlertResponse,
-    AlertStatusUpdate,
-    PredictionResponse,
-)
-from anomaly_detection.schemas.flows import FlowDetailResponse
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
+from anomaly_detection.db.models import Alert, AlertSeverity, AlertStatus
+from anomaly_detection.schemas.common import AlertResponse, AlertUpdateRequest
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
 
 
-class VerdictEnum(StrEnum):
-    TRUE_POSITIVE = "true_positive"
-    FALSE_POSITIVE = "false_positive"
-
-
-class FeedbackSubmit(BaseModel):
-    verdict: VerdictEnum
-
-
-def _get_session(request: Request) -> AsyncSession:
-    return cast("AsyncSession", request.app.state.session_factory())
-
-
-def _require_auth(request: Request) -> str:
-    user = request.session.get("user")
-    if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return cast("str", user)
-
-
-@router.get("", response_model=list[AlertResponse])
+@router.get("")
 async def list_alerts(
     request: Request,
-    limit: int = Query(50, ge=1, le=500),
-    offset: int = Query(0, ge=0),
-    status: str | None = Query(None, pattern="^(open|acknowledged|resolved)$"),
-    severity: str | None = Query(None, pattern="^(low|medium|high|critical)$"),
-    attack_type: str | None = Query(None),
-) -> list[AlertResponse]:
-    async with _get_session(request) as session:
-        query = select(Alert).order_by(desc(Alert.created_at))
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=1, le=100),
+    severity: str | None = None,
+    status: str | None = None,
+    search: str | None = None,
+) -> dict:
+    """List alerts with pagination and filtering."""
+    session_factory = request.app.state.session_factory
 
+    async with session_factory() as session:
+        query = select(Alert)
+        count_query = select(func.count(Alert.id))
+
+        if severity:
+            query = query.where(Alert.severity == AlertSeverity(severity))
+            count_query = count_query.where(Alert.severity == AlertSeverity(severity))
         if status:
             query = query.where(Alert.status == AlertStatus(status))
-        if severity:
-            from anomaly_detection.db.models import AlertSeverity
-
-            query = query.where(Alert.severity == AlertSeverity(severity))
-        if attack_type:
-            query = query.where(Alert.suspected_attack_type == attack_type)
-
-        query = query.limit(limit).offset(offset)
-        alerts = (await session.execute(query)).scalars().all()
-
-        feedback_map: dict[uuid.UUID, str] = {}
-        if alerts:
-            alert_ids = [a.id for a in alerts]
-            feedbacks = (
-                (await session.execute(select(Feedback).where(Feedback.alert_id.in_(alert_ids))))
-                .scalars()
-                .all()
+            count_query = count_query.where(Alert.status == AlertStatus(status))
+        if search:
+            search_filter = (
+                Alert.title.ilike(f"%{search}%")
+                | Alert.source_ip.ilike(f"%{search}%")
+                | Alert.description.ilike(f"%{search}%")
             )
-            feedback_map = {f.alert_id: f.verdict for f in feedbacks}
+            query = query.where(search_filter)
+            count_query = count_query.where(search_filter)
 
-        return [
-            AlertResponse(
-                id=a.id,
-                flow_id=a.flow_id,
-                severity=a.severity.value,
-                suspected_attack_type=a.suspected_attack_type,
-                status=a.status.value,
-                created_at=a.created_at,
-                feedback_verdict=feedback_map.get(a.id),
-            )
-            for a in alerts
-        ]
-
-
-@router.get("/feedback/export")
-async def export_feedback(request: Request) -> StreamingResponse:
-    """Download analyst-labelled feedback as CSV for model retraining."""
-    _require_auth(request)
-
-    async with _get_session(request) as session:
-        feedbacks = (
-            (
-                await session.execute(
-                    select(Feedback).options(selectinload(Feedback.alert).selectinload(Alert.flow))
-                )
-            )
-            .scalars()
-            .all()
+        total = (await session.execute(count_query)).scalar() or 0
+        offset = (page - 1) * per_page
+        result = await session.execute(
+            query.order_by(Alert.created_at.desc()).offset(offset).limit(per_page)
         )
+        alerts = result.scalars().all()
 
-    output = io.StringIO()
-    writer = csv.writer(output)
-
-    headers = [
-        "feedback_id",
-        "alert_id",
-        "flow_id",
-        "verdict",
-        "user",
-        "created_at",
-        "original_label",
-        "suspected_attack_type",
-        "corrected_label",
-        *FEATURE_COLUMNS,
-    ]
-    writer.writerow(headers)
-
-    for fb in feedbacks:
-        alert = fb.alert
-        flow: Flow | None = alert.flow if alert else None
-        if flow is None:
-            continue
-
-        corrected_label = (
-            alert.suspected_attack_type or "ANOMALY"
-            if fb.verdict == VerdictEnum.TRUE_POSITIVE
-            else "BENIGN"
-        )
-
-        row = [
-            str(fb.id),
-            str(fb.alert_id),
-            str(flow.id),
-            fb.verdict,
-            fb.user,
-            fb.created_at.isoformat(),
-            flow.label or "UNKNOWN",
-            alert.suspected_attack_type or "",
-            corrected_label,
-            *[str(getattr(flow, col, 0.0)) for col in FEATURE_COLUMNS],
-        ]
-        writer.writerow(row)
-
-    output.seek(0)
-    response = StreamingResponse(iter([output.getvalue()]), media_type="text/csv")
-    response.headers["Content-Disposition"] = "attachment; filename=analyst_feedback_dataset.csv"
-    return response
+        return {
+            "items": [
+                AlertResponse(
+                    id=a.id,
+                    title=a.title,
+                    description=a.description,
+                    severity=a.severity.value,
+                    status=a.status.value,
+                    source_ip=a.source_ip,
+                    attack_type=a.attack_type,
+                    is_read=a.is_read,
+                    created_at=a.created_at,
+                    resolved_at=a.resolved_at,
+                ).model_dump()
+                for a in alerts
+            ],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": max(1, (total + per_page - 1) // per_page),
+        }
 
 
-@router.get("/{alert_id}", response_model=AlertDetailResponse)
-async def get_alert_detail(request: Request, alert_id: str) -> AlertDetailResponse:
-    try:
-        alert_uuid = uuid.UUID(alert_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid alert ID")
+@router.get("/count")
+async def alert_counts(request: Request) -> dict:
+    """Get counts by severity and status."""
+    session_factory = request.app.state.session_factory
 
-    async with _get_session(request) as session:
-        alert = (
+    async with session_factory() as session:
+        total = (await session.execute(select(func.count(Alert.id)))).scalar() or 0
+        critical = (
             await session.execute(
-                select(Alert)
-                .options(selectinload(Alert.flow).selectinload(Flow.predictions))
-                .where(Alert.id == alert_uuid)
+                select(func.count(Alert.id)).where(Alert.severity == AlertSeverity.CRITICAL)
             )
-        ).scalar_one_or_none()
+        ).scalar() or 0
+        high = (
+            await session.execute(
+                select(func.count(Alert.id)).where(Alert.severity == AlertSeverity.HIGH)
+            )
+        ).scalar() or 0
+        unread = (
+            await session.execute(
+                select(func.count(Alert.id)).where(Alert.is_read.is_(False))
+            )
+        ).scalar() or 0
+        open_count = (
+            await session.execute(
+                select(func.count(Alert.id)).where(Alert.status == AlertStatus.OPEN)
+            )
+        ).scalar() or 0
 
-        if alert is None:
-            raise HTTPException(status_code=404, detail="Alert not found")
+        return {
+            "total": total,
+            "critical": critical,
+            "high": high,
+            "unread": unread,
+            "open": open_count,
+        }
 
-        feedback = (
-            await session.execute(select(Feedback).where(Feedback.alert_id == alert_uuid))
-        ).scalar_one_or_none()
 
-        flow_detail = None
-        if alert.flow:
-            flow_detail = FlowDetailResponse.model_validate(alert.flow)
+@router.put("/{alert_id}")
+async def update_alert(request: Request, alert_id: str, body: AlertUpdateRequest) -> dict:
+    """Update alert status or read state."""
+    session_factory = request.app.state.session_factory
 
-        predictions_list = []
-        if alert.flow and alert.flow.predictions:
-            predictions_list = [
-                PredictionResponse.model_validate(p) for p in alert.flow.predictions
-            ]
-
-        # Calculate explainability (top feature contributions based on Z-score deviation from benign baseline)
-        explainability: dict[str, float] = {}
-        if alert.flow:
-            feature_stats = getattr(request.app.state, "feature_stats", {})
-            contributions = []
-            for col in FEATURE_COLUMNS:
-                if hasattr(alert.flow, col) and col in feature_stats:
-                    val = getattr(alert.flow, col)
-                    mean = feature_stats[col]["mean"]
-                    std = feature_stats[col]["std"]
-                    z_score = abs(float(val) - mean) / std
-                    contributions.append((col, z_score))
-
-            if contributions:
-                # Sort by Z-score descending and take top 5
-                contributions.sort(key=lambda x: x[1], reverse=True)
-                top_contributors = contributions[:5]
-                total_z = sum(c[1] for c in top_contributors)
-                if total_z > 0:
-                    explainability = {c[0]: float(c[1] / total_z) for c in top_contributors}
-                else:
-                    explainability = {c[0]: 0.2 for c in top_contributors}
-
-        return AlertDetailResponse(
-            id=alert.id,
-            flow_id=alert.flow_id,
-            severity=alert.severity.value,
-            suspected_attack_type=alert.suspected_attack_type,
-            status=alert.status.value,
-            created_at=alert.created_at,
-            feedback_verdict=feedback.verdict if feedback else None,
-            flow=flow_detail,
-            predictions=predictions_list,
-            explainability=explainability if explainability else None,
+    async with session_factory() as session:
+        result = await session.execute(
+            select(Alert).where(Alert.id == alert_id)
         )
-
-
-@router.patch("/{alert_id}/status", response_model=AlertResponse)
-async def update_alert_status(
-    request: Request,
-    alert_id: str,
-    update: AlertStatusUpdate,
-) -> AlertResponse:
-    try:
-        alert_uuid = uuid.UUID(alert_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid alert ID")
-
-    async with _get_session(request) as session:
-        alert = (
-            await session.execute(select(Alert).where(Alert.id == alert_uuid))
-        ).scalar_one_or_none()
-
-        if alert is None:
-            raise HTTPException(status_code=404, detail="Alert not found")
-
-        alert.status = AlertStatus(update.status)
-        await session.commit()
-
-        return AlertResponse(
-            id=alert.id,
-            flow_id=alert.flow_id,
-            severity=alert.severity.value,
-            suspected_attack_type=alert.suspected_attack_type,
-            status=alert.status.value,
-            created_at=alert.created_at,
-        )
-
-
-@router.post("/{alert_id}/feedback")
-async def submit_alert_feedback(
-    request: Request,
-    alert_id: str,
-    payload: FeedbackSubmit,
-) -> dict[str, str]:
-    try:
-        alert_uuid = uuid.UUID(alert_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid alert ID")
-
-    username = request.session.get("user", "anonymous")
-
-    async with _get_session(request) as session:
-        alert = (
-            await session.execute(select(Alert).where(Alert.id == alert_uuid))
-        ).scalar_one_or_none()
+        alert = result.scalar_one_or_none()
         if not alert:
-            raise HTTPException(status_code=404, detail="Alert not found")
+            return JSONResponse(status_code=404, content={"detail": "Alert not found"})
 
-        feedback = (
-            await session.execute(select(Feedback).where(Feedback.alert_id == alert_uuid))
-        ).scalar_one_or_none()
-
-        if feedback:
-            feedback.verdict = payload.verdict.value
-            feedback.user = username
-            feedback.created_at = datetime.now(UTC)
-        else:
-            session.add(
-                Feedback(
-                    alert_id=alert_uuid,
-                    verdict=payload.verdict.value,
-                    user=username,
-                )
-            )
+        if body.status:
+            try:
+                alert.status = AlertStatus(body.status)
+                if body.status == "resolved":
+                    alert.resolved_at = datetime.now(timezone.utc)
+            except ValueError:
+                pass
+        if body.is_read is not None:
+            alert.is_read = body.is_read
 
         await session.commit()
 
-    return {"status": "feedback_submitted", "verdict": payload.verdict.value}
+    return {"message": "Alert updated"}
+
+
+@router.post("/mark-all-read")
+async def mark_all_read(request: Request) -> dict:
+    """Mark all alerts as read."""
+    session_factory = request.app.state.session_factory
+
+    async with session_factory() as session:
+        result = await session.execute(
+            select(Alert).where(Alert.is_read.is_(False))
+        )
+        for alert in result.scalars().all():
+            alert.is_read = True
+        await session.commit()
+
+    return {"message": "All alerts marked as read"}

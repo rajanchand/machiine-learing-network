@@ -1,160 +1,387 @@
-"""Pydantic v2 schemas for predictions, alerts, models, and stats."""
+"""Pydantic schemas for API request/response validation."""
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
-if TYPE_CHECKING:
-    from anomaly_detection.schemas.flows import FlowDetailResponse
 
-# --- Prediction schemas ---
+# =============================================================================
+# Health / System
+# =============================================================================
+class HealthResponse(BaseModel):
+    status: str = "ok"
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+
+# =============================================================================
+# Authentication
+# =============================================================================
+class LoginRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=128)
+    password: str = Field(..., min_length=6, max_length=256)
+
+
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=128)
+    email: str = Field(..., min_length=5, max_length=256)
+    password: str = Field(..., min_length=6, max_length=256)
+    full_name: str = Field(default="", max_length=256)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=6, max_length=256)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    user: UserResponse | None = None
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+# =============================================================================
+# Users
+# =============================================================================
+class UserResponse(BaseModel):
+    id: UUID
+    username: str
+    email: str
+    full_name: str
+    role: str
+    status: str
+    avatar_url: str | None = None
+    last_login: datetime | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UserCreateRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=128)
+    email: str = Field(..., min_length=5, max_length=256)
+    password: str = Field(..., min_length=6, max_length=256)
+    full_name: str = Field(default="", max_length=256)
+    role: str = Field(default="analyst")
+
+
+class UserUpdateRequest(BaseModel):
+    full_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    role: str | None = None
+    status: str | None = None
+
+
+# =============================================================================
+# Dashboard
+# =============================================================================
+class DashboardStats(BaseModel):
+    total_packets: int = 0
+    normal_traffic: int = 0
+    detected_anomalies: int = 0
+    todays_attacks: int = 0
+    threat_level: str = "Low"
+    cpu_usage: float = 0.0
+    memory_usage: float = 0.0
+    bandwidth_usage: float = 0.0
+    packets_per_second: float = 0.0
+    active_devices: int = 0
+    model_accuracy: float = 0.0
+    prediction_time: float = 0.0
+    detection_rate: float = 0.0
+
+
+class RecentAlert(BaseModel):
+    id: UUID
+    title: str
+    severity: str
+    status: str
+    source_ip: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class RecentPrediction(BaseModel):
+    id: UUID
+    model_name: str
+    is_anomaly: bool
+    confidence: float
+    prediction_label: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# =============================================================================
+# Packets
+# =============================================================================
+class PacketResponse(BaseModel):
+    id: UUID
+    timestamp: datetime
+    src_ip: str
+    dst_ip: str
+    protocol: str
+    src_port: int
+    dst_port: int
+    packet_size: int
+    ttl: int
+    flags: str
+    status: str
+
+    model_config = {"from_attributes": True}
+
+
+class PacketCaptureResponse(BaseModel):
+    id: UUID
+    interface: str
+    status: str
+    packet_count: int
+    started_at: datetime
+    stopped_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+# =============================================================================
+# ML Models & Predictions
+# =============================================================================
+class ModelResponse(BaseModel):
+    id: UUID
+    name: str
+    model_type: str
+    version: str
+    status: str
+    accuracy: float
+    precision_score: float
+    recall: float
+    f1_score: float
+    threshold: float
+    description: str | None = None
+    feature_importance: dict[str, float] | None = None
+    confusion_matrix: dict[str, Any] | None = None
+    trained_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TrainRequest(BaseModel):
+    model_type: str = Field(..., description="One of: random_forest, isolation_forest, decision_tree, xgboost")
+    dataset_id: str | None = None
+    params: dict[str, Any] | None = None
+
+
+class PredictRequest(BaseModel):
+    model_name: str = "random_forest"
+    features: dict[str, float] = {}
 
 
 class PredictionResponse(BaseModel):
-    """Schema for prediction API responses."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    flow_id: uuid.UUID
+    id: UUID
     model_name: str
-    model_version: str
-    score: float
     is_anomaly: bool
-    threshold: float
-    created_at: datetime
-
-
-# --- Alert schemas ---
-
-
-class AlertResponse(BaseModel):
-    """Schema for alert API responses."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    flow_id: uuid.UUID
-    severity: str
-    suspected_attack_type: str | None = None
-    status: str
-    created_at: datetime
-    feedback_verdict: str | None = None
-
-
-class AlertDetailResponse(AlertResponse):
-    """Alert detail including flow features and predictions."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    flow: FlowDetailResponse | None = None
-    predictions: list[PredictionResponse] = Field(default_factory=list)
-    explainability: dict[str, float] | None = None
-
-
-class AlertStatusUpdate(BaseModel):
-    """Request schema for updating alert status."""
-
-    status: str = Field(
-        pattern="^(open|acknowledged|resolved)$",
-        description="New alert status",
-    )
-
-
-# --- Model schemas ---
-
-
-class ModelResponse(BaseModel):
-    """Schema for ML model API responses."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    name: str
-    version: str
-    trained_at: datetime
-    metrics_json: dict[str, Any] | None = None
-    artifact_path: str
-    threshold: float
-    is_active: bool
-    description: str | None = None
-
-
-class ThresholdUpdate(BaseModel):
-    """Request schema for updating model threshold."""
-
-    threshold: float = Field(ge=0.0, le=1.0, description="New anomaly threshold")
-
-
-# --- Stats schemas ---
-
-
-class TopTalker(BaseModel):
-    """IP address with flow count for top-talkers display."""
-
-    ip: str
-    flow_count: int
-
-
-class KPIResponse(BaseModel):
-    """Key performance indicators for the dashboard."""
-
-    total_flows: int = Field(ge=0)
-    total_alerts: int = Field(ge=0)
-    open_alerts: int = Field(ge=0)
-    estimated_fpr: float = Field(ge=0.0, le=1.0)
-    top_talkers: list[TopTalker] = Field(default_factory=list)
-
-
-class TimelinePoint(BaseModel):
-    """Single point in anomaly score timeline."""
-
-    timestamp: datetime
-    avg_score: float
-    max_score: float
-    flow_count: int
-    anomaly_count: int
-
-
-class TimelineResponse(BaseModel):
-    """Anomaly score timeline data for charts."""
-
-    points: list[TimelinePoint] = Field(default_factory=list)
-    threshold: float
-
-
-# --- SSE event schemas ---
-
-
-class StreamEvent(BaseModel):
-    """Schema for SSE stream events sent to the dashboard."""
-
-    event_type: str = Field(description="Event type: flow, prediction, alert")
-    flow_id: uuid.UUID
-    ts: datetime
+    confidence: float
+    prediction_label: str
     src_ip: str
     dst_ip: str
-    protocol: int
-    score: float | None = None
-    is_anomaly: bool | None = None
-    model_name: str | None = None
-    alert_id: uuid.UUID | None = None
-    severity: str | None = None
-    suspected_attack_type: str | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
-# Forward reference resolution
-from anomaly_detection.schemas.flows import FlowDetailResponse  # noqa: E402
+# =============================================================================
+# Attacks
+# =============================================================================
+class AttackResponse(BaseModel):
+    id: UUID
+    attack_type: str
+    severity: str
+    confidence: float
+    src_ip: str
+    dst_ip: str
+    src_port: int
+    dst_port: int
+    protocol: str
+    recommendation: str
+    is_blocked: bool
+    detected_at: datetime
 
-AlertDetailResponse.model_rebuild()
+    model_config = {"from_attributes": True}
 
 
-class HealthResponse(BaseModel):
-    """Health check response."""
+class BlockIPRequest(BaseModel):
+    ip_address: str
+    reason: str = ""
+    attack_type: str | None = None
 
-    status: str = "ok"
-    version: str = "0.1.0"
+
+# =============================================================================
+# Alerts
+# =============================================================================
+class AlertResponse(BaseModel):
+    id: UUID
+    title: str
+    description: str
+    severity: str
+    status: str
+    source_ip: str
+    attack_type: str | None = None
+    is_read: bool
+    created_at: datetime
+    resolved_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class AlertUpdateRequest(BaseModel):
+    status: str | None = None
+    is_read: bool | None = None
+
+
+# =============================================================================
+# Reports
+# =============================================================================
+class ReportGenerateRequest(BaseModel):
+    report_type: str = Field(default="daily", description="daily, weekly, monthly, custom")
+    report_format: str = Field(default="pdf", description="pdf, excel, csv")
+    date_from: str | None = None
+    date_to: str | None = None
+
+
+class ReportResponse(BaseModel):
+    id: UUID
+    name: str
+    report_type: str
+    report_format: str
+    file_size: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# =============================================================================
+# Datasets
+# =============================================================================
+class DatasetResponse(BaseModel):
+    id: UUID
+    name: str
+    filename: str
+    file_size: int
+    row_count: int
+    column_count: int
+    columns_json: list[str] | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# =============================================================================
+# Logs
+# =============================================================================
+class LoginLogResponse(BaseModel):
+    id: UUID
+    username: str
+    ip_address: str
+    success: bool
+    failure_reason: str | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class SystemLogResponse(BaseModel):
+    id: UUID
+    level: str
+    source: str
+    message: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AuditLogResponse(BaseModel):
+    id: UUID
+    action: str
+    resource: str
+    resource_id: str | None = None
+    details: str | None = None
+    ip_address: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# =============================================================================
+# Settings
+# =============================================================================
+class SettingResponse(BaseModel):
+    key: str
+    value: str
+    description: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class SettingUpdateRequest(BaseModel):
+    settings: dict[str, str]
+
+
+# =============================================================================
+# Analytics
+# =============================================================================
+class TrafficTrend(BaseModel):
+    timestamp: str
+    count: int
+
+
+class AttackTrend(BaseModel):
+    timestamp: str
+    count: int
+
+
+class ProtocolUsage(BaseModel):
+    protocol: str
+    count: int
+
+
+class TopAttacker(BaseModel):
+    ip_address: str
+    attack_count: int
+
+
+class TopPort(BaseModel):
+    port: int
+    count: int
+
+
+class ModelMetrics(BaseModel):
+    name: str
+    accuracy: float
+    precision_score: float
+    recall: float
+    f1_score: float
+
+
+# =============================================================================
+# Paginated Response
+# =============================================================================
+class PaginatedResponse(BaseModel):
+    items: list[Any]
+    total: int
+    page: int
+    per_page: int
+    total_pages: int

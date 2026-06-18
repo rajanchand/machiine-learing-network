@@ -9,10 +9,8 @@ import numpy as np
 
 from anomaly_detection.constants import EXPECTED_FEATURE_COUNT
 from anomaly_detection.logging import get_logger
-from anomaly_detection.ml.autoencoder import AutoEncoderDetector
-from anomaly_detection.ml.halfspace_trees import HalfSpaceTreesDetector
+from anomaly_detection.ml.decision_tree import DecisionTreeDetector
 from anomaly_detection.ml.isolation_forest import IsolationForestDetector
-from anomaly_detection.ml.lightgbm_model import LightGBMBenchmark
 from anomaly_detection.ml.random_forest import RandomForestDetector
 from anomaly_detection.ml.xgboost_model import XGBoostDetector
 
@@ -24,11 +22,9 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 MODEL_LOADERS: dict[str, type[AnomalyDetector]] = {
-    "isolation_forest": IsolationForestDetector,
-    "autoencoder": AutoEncoderDetector,
-    "halfspace_trees": HalfSpaceTreesDetector,
-    "lightgbm_benchmark": LightGBMBenchmark,
     "random_forest": RandomForestDetector,
+    "isolation_forest": IsolationForestDetector,
+    "decision_tree": DecisionTreeDetector,
     "xgboost": XGBoostDetector,
 }
 

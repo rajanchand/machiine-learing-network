@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AnomalyGuard Logs — System events and security audit trail logs">
+    <title>Logs — AnomalyGuard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-wrapper" id="app">
+        <div class="main-content">
+            <!-- Topbar injected by JS -->
+            <div class="page-content">
+                <div class="breadcrumb-nav"><a href="dashboard.html">Home</a> / Logs</div>
+                
+                <div class="page-header d-flex justify-content-between align-items-center">
+                    <h2>System Audit & Activity Logs</h2>
+                    <button class="btn btn-outline-primary" onclick="exportCurrentLog()">
+                        <i class="fas fa-file-export me-2"></i> Export Current Log (CSV)
+                    </button>
+                </div>
+
+                <!-- Tabs Navigation -->
+                <ul class="nav nav-tabs mb-4" id="logTabs" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active" onclick="switchTab('system')"><i class="fas fa-desktop me-1"></i> System Events</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" onclick="switchTab('login')"><i class="fas fa-sign-in-alt me-1"></i> Login Audits</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" onclick="switchTab('packets')"><i class="fas fa-network-wired me-1"></i> Packet Logs</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" onclick="switchTab('attacks')"><i class="fas fa-fire me-1"></i> Attack Detections</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" onclick="switchTab('predictions')"><i class="fas fa-brain me-1"></i> ML Predictions</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" onclick="switchTab('audit')"><i class="fas fa-fingerprint me-1"></i> User Actions</button>
+                    </li>
+                </ul>
+
+                <!-- Logs List Card -->
+                <div class="table-container">
+                    <div class="table-header d-flex flex-wrap gap-3 align-items-center justify-content-between">
+                        <h5 id="tableTitle">System Event Logs</h5>
+                        <div class="d-flex gap-2">
+                            <!-- Contextual filters -->
+                            <select class="form-select form-select-sm" id="logLevelFilter" onchange="loadLogs(1)" style="display: block;">
+                                <option value="">-- All Levels --</option>
+                                <option value="info">Info</option>
+                                <option value="warning">Warning</option>
+                                <option value="error">Error</option>
+                                <option value="critical">Critical</option>
+                            </select>
+                            <input type="text" class="form-control form-control-sm" id="searchLogs" placeholder="Search logs..." onkeyup="searchLogsKeyup()">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadLogs(currentPage)"><i class="fas fa-sync-alt"></i></button>
+                        </div>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead id="logTableHead">
+                                <!-- Headers injected dynamically -->
+                            </thead>
+                            <tbody id="logTableBody">
+                                <!-- Logs loaded dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination-wrapper">
+                        <div id="paginationInfo">Showing 0 to 0 of 0 entries</div>
+                        <div id="paginationLinks"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/common.js"></script>
+    <script>
+        // Initialize layout
+        if (!initPageLayout('logs', 'Logs')) throw new Error('Auth required');
+
+        let currentTab = 'system';
+        let currentPage = 1;
+        const perPage = 15;
+        let searchTimeout;
+
+        function switchTab(tab) {
+            currentTab = tab;
+            currentPage = 1;
+            
+            // Highlight tab button
+            document.querySelectorAll('#logTabs .nav-link').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const activeBtn = Array.from(document.querySelectorAll('#logTabs .nav-link')).find(btn => btn.getAttribute('onclick').includes(tab));
+            if (activeBtn) activeBtn.classList.add('active');
+
+            // Show/hide level filter for system tab
+            const lvlFilter = document.getElementById('logLevelFilter');
+            const searchBox = document.getElementById('searchLogs');
+            
+            if (tab === 'system') {
+                lvlFilter.style.display = 'block';
+                searchBox.style.display = 'none';
+            } else if (tab === 'login') {
+                lvlFilter.style.display = 'none';
+                searchBox.style.display = 'block';
+                searchBox.placeholder = 'Search by username or IP...';
+            } else {
+                lvlFilter.style.display = 'none';
+                searchBox.style.display = 'none';
+            }
+
+            // Update title
+            const titles = {
+                system: 'System Event Logs',
+                login: 'Login Audit Logs',
+                packets: 'Packet Capture Logs',
+                attacks: 'Attack Detection Logs',
+                predictions: 'ML Prediction Logs',
+                audit: 'User Action Audit Trail'
+            };
+            document.getElementById('tableTitle').textContent = titles[tab];
+            
+            document.getElementById('searchLogs').value = '';
+            
+            loadLogs(1);
+        }
+
+        async function loadLogs(page = 1) {
+            currentPage = page;
+            const tbody = document.getElementById('logTableBody');
+            const thead = document.getElementById('logTableHead');
+            const search = document.getElementById('searchLogs').value;
+            const level = document.getElementById('logLevelFilter').value;
+
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted"><i class="fas fa-circle-notch fa-spin fa-2x mb-2 text-faint"></i><br>Fetching log entries...</td></tr>`;
+
+            try {
+                let res;
+                if (currentTab === 'system') {
+                    res = await API.getSystemLogs(page, perPage, level);
+                    thead.innerHTML = `<tr><th>Timestamp</th><th>Level</th><th>Source</th><th>Message</th></tr>`;
+                } else if (currentTab === 'login') {
+                    res = await API.getLoginLogs(page, perPage, search);
+                    thead.innerHTML = `<tr><th>Timestamp</th><th>Username</th><th>IP Address</th><th>Status</th><th>Reason</th></tr>`;
+                } else if (currentTab === 'packets') {
+                    res = await API.getPacketLogs(page, perPage);
+                    thead.innerHTML = `<tr><th>Timestamp</th><th>Source IP</th><th>Destination IP</th><th>Protocol</th><th>Size</th><th>Label</th></tr>`;
+                } else if (currentTab === 'attacks') {
+                    res = await API.getAttackLogs(page, perPage);
+                    thead.innerHTML = `<tr><th>Detected At</th><th>Attack Type</th><th>Severity</th><th>Source IP</th><th>Destination IP</th><th>Confidence</th></tr>`;
+                } else if (currentTab === 'predictions') {
+                    res = await API.getPredictionLogs(page, perPage);
+                    thead.innerHTML = `<tr><th>Timestamp</th><th>ML Model</th><th>Result</th><th>Label</th><th>Confidence</th></tr>`;
+                } else if (currentTab === 'audit') {
+                    res = await API.getAuditLogs(page, perPage);
+                    thead.innerHTML = `<tr><th>Timestamp</th><th>Action</th><th>Resource</th><th>Resource ID</th><th>Details</th><th>IP Address</th></tr>`;
+                }
+
+                if (res && res.items) {
+                    if (res.items.length > 0) {
+                        tbody.innerHTML = res.items.map(item => {
+                            if (currentTab === 'system') {
+                                const levelBadge = item.level === 'critical' || item.level === 'error' ? 'badge-critical' : item.level === 'warning' ? 'badge-high' : 'bg-light text-dark';
+                                return `
+                                    <tr>
+                                        <td class="text-muted text-mono">${formatDateTime(item.created_at)}</td>
+                                        <td><span class="badge ${levelBadge} text-uppercase">${item.level}</span></td>
+                                        <td class="fw-600">${item.source}</td>
+                                        <td>${item.message}</td>
+                                    </tr>
+                                `;
+                            } else if (currentTab === 'login') {
+                                return `
+                                    <tr>
+                                        <td class="text-muted text-mono">${formatDateTime(item.created_at)}</td>
+                                        <td class="fw-600">@${item.username}</td>
+                                        <td>${item.ip_address}</td>
+                                        <td>
+                                            <span class="badge ${item.success ? 'bg-success-light text-success' : 'bg-danger-light text-danger'}">
+                                                ${item.success ? 'Success' : 'Failed'}
+                                            </span>
+                                        </td>
+                                        <td class="text-danger small">${item.failure_reason || '—'}</td>
+                                    </tr>
+                                `;
+                            } else if (currentTab === 'packets') {
+                                const statusClass = item.status === 'Malicious' ? 'badge-critical' : item.status === 'Suspicious' ? 'badge-high' : 'badge-normal';
+                                return `
+                                    <tr>
+                                        <td class="text-muted text-mono">${formatDateTime(item.timestamp)}</td>
+                                        <td class="fw-600">${item.src_ip}</td>
+                                        <td>${item.dst_ip}</td>
+                                        <td><span class="badge bg-light text-dark">${item.protocol}</span></td>
+                                        <td>${item.packet_size} bytes</td>
+                                        <td><span class="badge-severity ${statusClass}">${item.status}</span></td>
+                                    </tr>
+                                `;
+                            } else if (currentTab === 'attacks') {
+                                const statusClass = item.severity === 'critical' ? 'badge-critical' : item.severity === 'high' ? 'badge-high' : 'badge-low';
+                                return `
+                                    <tr>
+                                        <td class="text-muted text-mono">${formatDateTime(item.detected_at)}</td>
+                                        <td class="fw-600 text-danger">${item.attack_type}</td>
+                                        <td><span class="badge-severity ${statusClass}">${item.severity}</span></td>
+                                        <td>${item.src_ip}</td>
+                                        <td>${item.dst_ip}</td>
+                                        <td>${(item.confidence * 100).toFixed(1)}%</td>
+                                    </tr>
+                                `;
+                            } else if (currentTab === 'predictions') {
+                                return `
+                                    <tr>
+                                        <td class="text-muted text-mono">${formatDateTime(item.created_at)}</td>
+                                        <td class="fw-600">${item.model_name}</td>
+                                        <td>
+                                            <span class="badge ${item.is_anomaly ? 'bg-danger-light text-danger' : 'bg-success-light text-success'}">
+                                                ${item.is_anomaly ? 'Anomaly' : 'Normal'}
+                                            </span>
+                                        </td>
+                                        <td><span class="badge bg-light text-dark">${item.prediction_label}</span></td>
+                                        <td class="fw-600">${(item.confidence * 100).toFixed(1)}%</td>
+                                    </tr>
+                                `;
+                            } else if (currentTab === 'audit') {
+                                return `
+                                    <tr>
+                                        <td class="text-muted text-mono">${formatDateTime(item.created_at)}</td>
+                                        <td class="fw-600">${item.action}</td>
+                                        <td>${item.resource || '—'}</td>
+                                        <td class="text-mono small">${item.resource_id || '—'}</td>
+                                        <td class="text-muted small">${item.details || '—'}</td>
+                                        <td>${item.ip_address}</td>
+                                    </tr>
+                                `;
+                            }
+                        }).join('');
+                    } else {
+                        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted">No log entries found.</td></tr>`;
+                    }
+
+                    // Pagination
+                    const start = (res.page - 1) * res.per_page + 1;
+                    const end = Math.min(start + res.items.length - 1, res.total);
+                    document.getElementById('paginationInfo').textContent = res.total > 0 ? `Showing ${start} to ${end} of ${res.total} entries` : 'Showing 0 entries';
+                    document.getElementById('paginationLinks').innerHTML = renderPagination(res.page, res.total_pages, 'loadLogs');
+                }
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-danger">Failed to fetch log details from backend.</td></tr>`;
+            }
+        }
+
+        function searchLogsKeyup() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                loadLogs(1);
+            }, 300);
+        }
+
+        function exportCurrentLog() {
+            // Direct download link
+            window.location.href = `${API.BASE}/api/v1/logs/export?log_type=${currentTab}`;
+            showToast(`Exporting ${currentTab} logs as CSV...`);
+        }
+
+        // Initial tab load
+        switchTab('system');
+    </script>
+</body>
+</html>

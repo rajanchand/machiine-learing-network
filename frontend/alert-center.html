@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Alert Center — AnomalyGuard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet"><link href="css/style.css" rel="stylesheet"></head><body>
+<div class="app-wrapper" id="app"><div class="main-content"><div class="page-content">
+    <div class="breadcrumb-nav"><a href="dashboard.html">Home</a> / Alert Center</div>
+    <div class="page-header"><h2>Alert Center</h2>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary btn-sm" onclick="markAllRead()"><i class="fas fa-check-double me-1"></i>Mark All Read</button>
+            <input type="text" class="form-control form-control-sm" id="searchBox" placeholder="Search..." style="width:200px" onkeyup="loadAlerts(1)">
+            <select class="form-select form-select-sm" id="sevFilter" style="width:130px" onchange="loadAlerts(1)"><option value="">All Severity</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+            <select class="form-select form-select-sm" id="statusFilter" style="width:140px" onchange="loadAlerts(1)"><option value="">All Status</option><option value="open">Open</option><option value="acknowledged">Acknowledged</option><option value="resolved">Resolved</option></select>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-3"><div class="stat-card" id="cTotal"><div class="stat-card-label">Total Alerts</div><div class="stat-card-value">—</div></div></div>
+        <div class="col-md-3"><div class="stat-card danger" id="cCritical"><div class="stat-card-label">Critical</div><div class="stat-card-value">—</div></div></div>
+        <div class="col-md-3"><div class="stat-card warning" id="cUnread"><div class="stat-card-label">Unread</div><div class="stat-card-value">—</div></div></div>
+        <div class="col-md-3"><div class="stat-card info" id="cOpen"><div class="stat-card-label">Open</div><div class="stat-card-value">—</div></div></div>
+    </div>
+
+    <div class="table-container">
+        <div class="table-responsive"><table class="table table-hover table-sm mb-0"><thead><tr><th>Title</th><th>Severity</th><th>Status</th><th>Source IP</th><th>Attack Type</th><th>Read</th><th>Time</th><th>Actions</th></tr></thead>
+        <tbody id="alertBody"><tr><td colspan="8" class="text-center text-muted py-4">Loading...</td></tr></tbody></table></div>
+        <div class="pagination-wrapper"><span id="alertInfo">—</span><div id="alertPag"></div></div>
+    </div>
+</div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/auth.js"></script><script src="js/api.js"></script><script src="js/common.js"></script>
+<script>
+    if(!initPageLayout('alerts','Alert Center'))throw new Error('Auth');
+    async function loadCounts(){
+        const c=await API.getAlertCounts();if(!c)return;
+        document.querySelector('#cTotal .stat-card-value').textContent=formatNumber(c.total);
+        document.querySelector('#cCritical .stat-card-value').textContent=formatNumber(c.critical);
+        document.querySelector('#cUnread .stat-card-value').textContent=formatNumber(c.unread);
+        document.querySelector('#cOpen .stat-card-value').textContent=formatNumber(c.open);
+    }
+    async function loadAlerts(page){
+        const data=await API.getAlerts(page,25,document.getElementById('sevFilter').value,document.getElementById('statusFilter').value,document.getElementById('searchBox').value);
+        if(!data)return;
+        document.getElementById('alertBody').innerHTML=data.items.length?data.items.map(a=>`
+            <tr><td>${a.title}</td><td>${severityBadge(a.severity)}</td><td>${statusBadge(a.status)}</td>
+            <td class="text-mono">${a.source_ip}</td><td>${a.attack_type||'—'}</td>
+            <td>${a.is_read?'<i class="fas fa-check text-success"></i>':'<i class="fas fa-circle text-warning" style="font-size:8px"></i>'}</td>
+            <td>${formatTimeAgo(a.created_at)}</td>
+            <td><div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-success" onclick="resolveAlert('${a.id}')" title="Resolve"><i class="fas fa-check"></i></button>
+                <button class="btn btn-outline-primary" onclick="ackAlert('${a.id}')" title="Acknowledge"><i class="fas fa-eye"></i></button>
+            </div></td></tr>`).join(''):'<tr><td colspan="8" class="text-center text-muted py-4">No alerts</td></tr>';
+        document.getElementById('alertInfo').textContent=`${data.items.length} of ${data.total}`;
+        document.getElementById('alertPag').innerHTML=renderPagination(data.page,data.total_pages,'loadAlerts');
+    }
+    async function resolveAlert(id){await API.updateAlert(id,{status:'resolved',is_read:true});showToast('Alert resolved');loadAlerts(1);loadCounts();}
+    async function ackAlert(id){await API.updateAlert(id,{status:'acknowledged',is_read:true});loadAlerts(1);loadCounts();}
+    async function markAllRead(){await API.post('/api/v1/alerts/mark-all-read');showToast('All marked as read');loadAlerts(1);loadCounts();}
+    loadCounts();loadAlerts(1);
+</script></body></html>

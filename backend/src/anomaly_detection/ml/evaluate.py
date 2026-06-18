@@ -36,11 +36,9 @@ from sklearn.metrics import (
 
 from anomaly_detection.constants import FEATURE_COLUMNS
 from anomaly_detection.logging import get_logger, setup_logging
-from anomaly_detection.ml.autoencoder import AutoEncoderDetector
 from anomaly_detection.ml.base import AnomalyDetector
-from anomaly_detection.ml.halfspace_trees import HalfSpaceTreesDetector
+from anomaly_detection.ml.decision_tree import DecisionTreeDetector
 from anomaly_detection.ml.isolation_forest import IsolationForestDetector
-from anomaly_detection.ml.lightgbm_model import LightGBMBenchmark
 from anomaly_detection.ml.random_forest import RandomForestDetector
 from anomaly_detection.ml.xgboost_model import XGBoostDetector
 
@@ -431,9 +429,7 @@ def run_evaluation(
     # Load models — skip any whose artifacts are missing
     model_registry: dict[str, tuple[type[AnomalyDetector], Path]] = {
         "isolation_forest": (IsolationForestDetector, model_dir / "isolation_forest" / "v1"),
-        "autoencoder": (AutoEncoderDetector, model_dir / "autoencoder" / "v1"),
-        "halfspace_trees": (HalfSpaceTreesDetector, model_dir / "halfspace_trees" / "v1"),
-        "lightgbm_benchmark": (LightGBMBenchmark, model_dir / "lightgbm_benchmark" / "v1"),
+        "decision_tree": (DecisionTreeDetector, model_dir / "decision_tree" / "v1"),
         "random_forest": (RandomForestDetector, model_dir / "random_forest" / "v1"),
         "xgboost": (XGBoostDetector, model_dir / "xgboost" / "v1"),
     }
