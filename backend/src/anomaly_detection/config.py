@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,23 +27,42 @@ class Settings(BaseSettings):
     database_url_sync: str = (
         "postgresql+psycopg2://anomaly:changeme_in_production@localhost:5432/anomaly_detection"
     )
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
 
-    # API
+    # API server
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     log_level: str = "INFO"
     cors_origins: list[str] = ["http://localhost:5173"]
 
-    # Model registry — overridable via MODEL_REGISTRY_PATH env var
-    model_registry_path: Path = Path("/app/models")
+    # Security — SESSION_SECRET_KEY must be set in production
+    session_secret_key: str = Field(
+        default="dev-only-secret-change-in-production-min-32-chars",
+        min_length=32,
+    )
+    simulator_api_key: str = "simulator-secret"
+    environment: Literal["development", "staging", "production"] = "development"
 
-    # Data directory — overridable via DATA_DIR env var
+    # Rate limiting
+    login_rate_limit: int = 10  # max login attempts per minute per IP
+    batch_max_size: int = 500   # max flows per batch request
+
+    # Model registry and data paths
+    model_registry_path: Path = Path("/app/models")
     data_dir: Path = Path("/app/data")
+
+    # Evaluated thresholds at ~1% FPR (fallback if not in metrics.json)
+    default_thresholds: dict[str, float] = {
+        "autoencoder": 0.0035,
+        "isolation_forest": 0.39,
+        "halfspace_trees": 0.976,
+        "lightgbm_benchmark": 0.56,
+    }
 
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:
-        """Parse CORS origins from JSON string or list."""
         if isinstance(v, str):
             try:
                 parsed = json.loads(v)
@@ -57,21 +76,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def ensure_directories_exist(self) -> "Settings":
-        """Create model registry and data directories if they don't exist.
-        Silently skips on read-only file systems (e.g. inside Docker with
-        externally mounted volumes, or during unit tests with temp dirs).
-        """
         for path in (self.model_registry_path, self.data_dir):
             try:
                 path.mkdir(parents=True, exist_ok=True)
             except (OSError, PermissionError):
-                # Directory either already exists or is on a read-only FS;
-                # the application will fail later only if it actually needs
-                # to write there.
                 pass
         return self
 
 
 def get_settings() -> Settings:
-    """Factory function for settings — enables dependency injection and testing."""
     return Settings()

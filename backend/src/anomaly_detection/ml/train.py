@@ -21,6 +21,8 @@ from anomaly_detection.ml.autoencoder import AutoEncoderDetector
 from anomaly_detection.ml.halfspace_trees import HalfSpaceTreesDetector
 from anomaly_detection.ml.isolation_forest import IsolationForestDetector
 from anomaly_detection.ml.lightgbm_model import LightGBMBenchmark
+from anomaly_detection.ml.random_forest import RandomForestDetector
+from anomaly_detection.ml.xgboost_model import XGBoostDetector
 from anomaly_detection.schemas.flows import FEATURE_COLUMNS
 
 logger = get_logger(__name__)
@@ -82,6 +84,18 @@ def train_all_models(data_dir: Path, output_dir: Path) -> None:
     lgbm = LightGBMBenchmark(n_estimators=200, max_depth=8)
     lgbm.fit(X_full, y_full)
     lgbm.save(output_dir / "lightgbm_benchmark" / "v1")
+
+    # --- 5. Random Forest (supervised) ---
+    logger.info("training_model", model="random_forest")
+    rf = RandomForestDetector(n_estimators=200, max_depth=10)
+    rf.fit(X_full, y_full)
+    rf.save(output_dir / "random_forest" / "v1")
+
+    # --- 6. XGBoost (supervised) ---
+    logger.info("training_model", model="xgboost")
+    xgb_model = XGBoostDetector(n_estimators=200, max_depth=6, learning_rate=0.1)
+    xgb_model.fit(X_full, y_full)
+    xgb_model.save(output_dir / "xgboost" / "v1")
 
     logger.info("all_models_trained", output_dir=str(output_dir))
 

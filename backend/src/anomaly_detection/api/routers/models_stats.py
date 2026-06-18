@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, cast
 
 from fastapi import APIRouter, HTTPException, Request
@@ -215,3 +216,39 @@ async def get_timeline(request: Request) -> TimelineResponse:
         threshold = inference_svc.get_threshold()
 
         return TimelineResponse(points=points, threshold=threshold)
+
+
+@models_router.get("/comparison")
+async def get_model_comparison(request: Request) -> list[dict]:
+    """Return evaluation metrics for all models side by side."""
+    settings = request.app.state.settings
+    metrics_path = settings.data_dir.parent / "evaluation" / "metrics.json"
+
+    if not metrics_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Evaluation metrics not found. Run the evaluation script first.",
+        )
+
+    try:
+        all_metrics: dict = json.loads(metrics_path.read_text())
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Failed to read metrics file") from exc
+
+    result = []
+    for name, m in all_metrics.items():
+        cm = m.get("confusion_matrix", {})
+        result.append({
+            "name": name,
+            "model_type": m.get("model_type", "unsupervised"),
+            "accuracy": m.get("accuracy", 0.0),
+            "precision": m.get("precision", 0.0),
+            "recall": m.get("recall", 0.0),
+            "f1": m.get("f1", 0.0),
+            "roc_auc": m.get("roc_auc", 0.0),
+            "pr_auc": m.get("pr_auc", 0.0),
+            "fpr": m.get("fpr", 0.0),
+            "confusion_matrix": cm,
+            "per_attack_recall": m.get("per_attack_recall", {}),
+        })
+    return result

@@ -39,6 +39,8 @@ from anomaly_detection.ml.autoencoder import AutoEncoderDetector
 from anomaly_detection.ml.halfspace_trees import HalfSpaceTreesDetector
 from anomaly_detection.ml.isolation_forest import IsolationForestDetector
 from anomaly_detection.ml.lightgbm_model import LightGBMBenchmark
+from anomaly_detection.ml.random_forest import RandomForestDetector
+from anomaly_detection.ml.xgboost_model import XGBoostDetector
 from anomaly_detection.schemas.flows import FEATURE_COLUMNS
 
 matplotlib.use("Agg")  # Non-interactive backend
@@ -174,6 +176,7 @@ def evaluate_model(
     cm = confusion_matrix(y_test, predictions)
     tn, fp, fn, tp = cm.ravel()
     fpr_actual = float(fp / (fp + tn)) if (fp + tn) > 0 else 0.0
+    accuracy = float((tp + tn) / (tp + tn + fp + fn)) if (tp + tn + fp + fn) > 0 else 0.0
 
     # Per-attack-type recall
     per_attack = compute_per_attack_recall(labels, predictions)
@@ -201,6 +204,7 @@ def evaluate_model(
     metrics: dict[str, object] = {
         "model_name": name,
         "model_type": model.model_type,
+        "accuracy": round(accuracy, 4),
         "roc_auc": round(roc_auc, 4),
         "pr_auc": round(pr_auc, 4),
         "precision": round(precision, 4),
@@ -238,7 +242,7 @@ def plot_roc_curves(
     """Plot overlaid ROC curves for all models."""
     fig, ax = plt.subplots(figsize=(10, 8))
 
-    colors = ["#3b82f6", "#ef4444", "#f59e0b", "#10b981"]
+    colors = ["#3b82f6", "#ef4444", "#f59e0b", "#10b981", "#8b5cf6", "#f97316"]
     for (name, scores), color in zip(all_scores.items(), colors, strict=False):
         fpr_values, tpr_values, _ = roc_curve(y_test, scores)
         roc_auc_val = auc(fpr_values, tpr_values)
@@ -265,7 +269,7 @@ def plot_pr_curves(
     """Plot overlaid Precision-Recall curves for all models."""
     fig, ax = plt.subplots(figsize=(10, 8))
 
-    colors = ["#3b82f6", "#ef4444", "#f59e0b", "#10b981"]
+    colors = ["#3b82f6", "#ef4444", "#f59e0b", "#10b981", "#8b5cf6", "#f97316"]
     for (name, scores), color in zip(all_scores.items(), colors, strict=False):
         prec, rec, _ = precision_recall_curve(y_test, scores)
         pr_auc_val = average_precision_score(y_test, scores)
@@ -289,9 +293,12 @@ def plot_confusion_matrices(
     all_metrics: dict[str, dict[str, object]],
     output_path: Path,
 ) -> None:
-    """Plot 2x2 grid of confusion matrices."""
-    fig, axes = plt.subplots(2, 2, figsize=(14, 12))
-    axes_flat = axes.flatten()
+    """Plot grid of confusion matrices (2 columns, auto rows)."""
+    n = len(all_metrics)
+    cols = 2
+    rows = (n + 1) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(14, 6 * rows))
+    axes_flat = axes.flatten() if n > 1 else [axes]
 
     for idx, (name, metrics) in enumerate(all_metrics.items()):
         ax = axes_flat[idx]
@@ -314,6 +321,10 @@ def plot_confusion_matrices(
         model_type_label = " (supervised)" if "benchmark" in name else ""
         ax.set_title(f"{name}{model_type_label}", fontsize=13)
         fig.colorbar(im, ax=ax, shrink=0.6)
+
+    # Hide unused subplots when count is odd
+    for idx in range(n, len(axes_flat)):
+        axes_flat[idx].set_visible(False)
 
     fig.suptitle("Confusion Matrices — All Models", fontsize=15, y=1.02)
     fig.tight_layout()
@@ -411,13 +422,21 @@ def run_evaluation(
         positive_rate=float(y_test.sum() / len(y_test)),
     )
 
-    # Load models
-    models: dict[str, object] = {
-        "isolation_forest": IsolationForestDetector.load(model_dir / "isolation_forest" / "v1"),
-        "autoencoder": AutoEncoderDetector.load(model_dir / "autoencoder" / "v1"),
-        "halfspace_trees": HalfSpaceTreesDetector.load(model_dir / "halfspace_trees" / "v1"),
-        "lightgbm_benchmark": LightGBMBenchmark.load(model_dir / "lightgbm_benchmark" / "v1"),
+    # Load models — skip any whose artifacts are missing
+    model_registry: dict[str, tuple[type, Path]] = {
+        "isolation_forest": (IsolationForestDetector, model_dir / "isolation_forest" / "v1"),
+        "autoencoder": (AutoEncoderDetector, model_dir / "autoencoder" / "v1"),
+        "halfspace_trees": (HalfSpaceTreesDetector, model_dir / "halfspace_trees" / "v1"),
+        "lightgbm_benchmark": (LightGBMBenchmark, model_dir / "lightgbm_benchmark" / "v1"),
+        "random_forest": (RandomForestDetector, model_dir / "random_forest" / "v1"),
+        "xgboost": (XGBoostDetector, model_dir / "xgboost" / "v1"),
     }
+    models: dict[str, object] = {}
+    for model_name, (cls, model_path) in model_registry.items():
+        if (model_path / "model.joblib").exists():
+            models[model_name] = cls.load(model_path)
+        else:
+            logger.warning("model_artifact_missing_skipping", model=model_name, path=str(model_path))
 
     # Evaluate each model
     all_metrics: dict[str, dict[str, object]] = {}

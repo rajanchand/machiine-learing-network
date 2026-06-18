@@ -24,6 +24,8 @@ os.environ.setdefault(
     "DATABASE_URL",
     "sqlite+aiosqlite:///:memory:",
 )
+# Bypass rate limiter in tests
+os.environ.setdefault("LOGIN_RATE_LIMIT", "9999")
 
 from anomaly_detection.app import create_app  # noqa: E402
 from anomaly_detection.db.models import Base  # noqa: E402
@@ -121,6 +123,8 @@ async def app_client(session_factory) -> AsyncGenerator[AsyncClient, None]:
     inference_service.load_models()
     app.state.inference_service = inference_service
     app.state.settings = settings
+    app.state.metrics_inference_count = 0
+    app.state.metrics_inference_sum = 0.0
 
     # Register models in database for list_models test if not already present
     from anomaly_detection.db.models import MLModel, User

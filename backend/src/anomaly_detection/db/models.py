@@ -21,6 +21,7 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -173,6 +174,12 @@ class Alert(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_alert_status", "status"),
+        Index("ix_alert_severity", "severity"),
+        Index("ix_alert_created_at", "created_at"),
     )
 
     # Relationships

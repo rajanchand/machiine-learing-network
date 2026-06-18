@@ -24,6 +24,8 @@ def unauthenticated_app(session_factory, db_engine):
     inference_service.load_models()
     app.state.inference_service = inference_service
     app.state.settings = settings
+    app.state.metrics_inference_count = 0
+    app.state.metrics_inference_sum = 0.0
     return app
 
 

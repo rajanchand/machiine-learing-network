@@ -1,7 +1,9 @@
-"""Authentication router for session-based login and logout."""
+"""Authentication router — session-based login and logout."""
 
 from __future__ import annotations
 
+import time
+from collections import defaultdict
 from typing import cast
 
 from fastapi import APIRouter, HTTPException, Request
@@ -10,65 +12,84 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anomaly_detection.db.models import User
+from anomaly_detection.logging import get_logger
 from anomaly_detection.utils.auth import verify_password
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
+# Simple in-memory rate limiter: {ip -> [(timestamp, count)]}
+# For multi-worker deployments, replace with Redis.
+_login_attempts: dict[str, list[float]] = defaultdict(list)
+
+
+def _check_rate_limit(ip: str, limit: int) -> None:
+    """Raise 429 if ip has exceeded `limit` login attempts in the last 60 seconds."""
+    now = time.monotonic()
+    window_start = now - 60
+    attempts = [t for t in _login_attempts[ip] if t > window_start]
+    _login_attempts[ip] = attempts
+
+    if len(attempts) >= limit:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many login attempts. Try again in a minute.",
+        )
+
+    _login_attempts[ip].append(now)
+
 
 class LoginRequest(BaseModel):
-    """Schema for login request."""
-
     username: str
     password: str
 
 
 class AuthResponse(BaseModel):
-    """Schema for authentication status response."""
-
     username: str
     status: str
 
 
 def _get_session(request: Request) -> AsyncSession:
-    """Get database session from request state."""
-    factory = request.app.state.session_factory
-    return cast("AsyncSession", factory())
+    return cast("AsyncSession", request.app.state.session_factory())
 
 
 @router.post("/login", response_model=AuthResponse)
 async def login(request: Request, payload: LoginRequest) -> AuthResponse:
-    """Authenticate a user and start a session."""
+    client_ip = request.client.host if request.client else "unknown"
+    settings = request.app.state.settings
+    _check_rate_limit(client_ip, settings.login_rate_limit)
+
     async with _get_session(request) as session:
-        result = await session.execute(
-            select(User).where(User.username == payload.username)
-        )
+        result = await session.execute(select(User).where(User.username == payload.username))
         user = result.scalar_one_or_none()
 
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid username or password",
-        )
+    # Always call verify_password to avoid timing differences that reveal valid usernames.
+    password_hash = user.password_hash if user else "x" * 60
+    is_valid = user is not None and verify_password(payload.password, password_hash)
 
-    # Start session by saving username in session cookie
-    request.session["user"] = user.username
-    return AuthResponse(username=user.username, status="authenticated")
+    if not is_valid:
+        logger.warning("login_failed", username=payload.username, ip=client_ip)
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+
+    request.session["user"] = user.username  # type: ignore[union-attr]
+    request.session["user_id"] = str(user.id)  # type: ignore[union-attr]
+    logger.info("login_success", username=user.username, ip=client_ip)  # type: ignore[union-attr]
+
+    return AuthResponse(username=user.username, status="authenticated")  # type: ignore[union-attr]
 
 
 @router.post("/logout")
 async def logout(request: Request) -> dict[str, str]:
-    """Terminate the current user session."""
+    username = request.session.get("user", "unknown")
     request.session.clear()
+    logger.info("logout", username=username)
     return {"status": "logged_out"}
 
 
 @router.get("/me", response_model=AuthResponse)
 async def me(request: Request) -> AuthResponse:
-    """Get the current authenticated user details."""
-    user = request.session.get("user")
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Not authenticated",
-        )
-    return AuthResponse(username=user, status="authenticated")
+    username = request.session.get("user")
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return AuthResponse(username=username, status="authenticated")

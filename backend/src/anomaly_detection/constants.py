@@ -1,0 +1,45 @@
+"""Shared constants for the anomaly detection system."""
+
+from __future__ import annotations
+
+FEATURE_COLUMNS: list[str] = [
+    "flow_duration",
+    "total_fwd_packets",
+    "total_bwd_packets",
+    "total_len_fwd_packets",
+    "total_len_bwd_packets",
+    "fwd_packet_len_max",
+    "fwd_packet_len_min",
+    "fwd_packet_len_mean",
+    "fwd_packet_len_std",
+    "bwd_packet_len_max",
+    "bwd_packet_len_min",
+    "bwd_packet_len_mean",
+    "bwd_packet_len_std",
+    "flow_bytes_per_s",
+    "flow_packets_per_s",
+    "fin_flag_count",
+    "syn_flag_count",
+    "rst_flag_count",
+    "psh_flag_count",
+    "ack_flag_count",
+    "urg_flag_count",
+    "flow_iat_mean",
+    "flow_iat_std",
+    "flow_iat_max",
+    "flow_iat_min",
+    "fwd_iat_mean",
+    "fwd_iat_std",
+    "fwd_iat_max",
+    "fwd_iat_min",
+    "bwd_iat_mean",
+    "bwd_iat_std",
+    "bwd_iat_max",
+    "bwd_iat_min",
+    "down_up_ratio",
+    "avg_packet_size",
+    "avg_fwd_segment_size",
+    "avg_bwd_segment_size",
+]
+
+EXPECTED_FEATURE_COUNT: int = len(FEATURE_COLUMNS)
