@@ -1,9 +1,7 @@
-"""Generate a realistic fixture dataset for tests and CI.
+"""Generate a synthetic NSL-KDD style fixture for tests and CI.
 
-This creates a ~3,000 row CSV that mimics CICIDS2017 column names and
-value distributions. It is NOT real network data — it is synthetic,
-deterministic (seeded), and checked into the repo so tests run without
-the full dataset.
+Creates ~3,000 rows with realistic NSL-KDD column distributions.
+NOT real network data — synthetic, deterministic (seeded).
 
 Run: python -m anomaly_detection.pipeline.generate_fixture
 """
@@ -14,238 +12,275 @@ import csv
 import random
 from pathlib import Path
 
-# Seed for reproducibility
 random.seed(42)
 
-# CICIDS2017 column names (with the leading-space quirk on some)
-COLUMNS = [
-    " Destination Port",
-    " Flow Duration",
-    " Total Fwd Packets",
-    " Total Backward Packets",
-    "Total Length of Fwd Packets",
-    " Total Length of Bwd Packets",
-    "Fwd Packet Length Max",
-    " Fwd Packet Length Min",
-    " Fwd Packet Length Mean",
-    " Fwd Packet Length Std",
-    "Bwd Packet Length Max",
-    " Bwd Packet Length Min",
-    " Bwd Packet Length Mean",
-    " Bwd Packet Length Std",
-    "Flow Bytes/s",
-    " Flow Packets/s",
-    " FIN Flag Count",
-    " SYN Flag Count",
-    " RST Flag Count",
-    " PSH Flag Count",
-    " ACK Flag Count",
-    " URG Flag Count",
-    "Flow IAT Mean",
-    " Flow IAT Std",
-    " Flow IAT Max",
-    " Flow IAT Min",
-    "Fwd IAT Mean",
-    " Fwd IAT Std",
-    " Fwd IAT Max",
-    " Fwd IAT Min",
-    "Bwd IAT Mean",
-    " Bwd IAT Std",
-    " Bwd IAT Max",
-    " Bwd IAT Min",
-    " Down/Up Ratio",
-    " Average Packet Size",
-    " Avg Fwd Segment Size",
-    " Avg Bwd Segment Size",
-    " Label",
-]
-
-# Additional columns for flow identification
-ID_COLUMNS = [
-    "Flow ID",
-    " Source IP",
-    " Source Port",
-    " Destination IP",
-    " Protocol",
-    " Timestamp",
-]
-
-ATTACK_TYPES = [
-    "BENIGN",
-    "DDoS",
-    "DoS Hulk",
-    "DoS GoldenEye",
-    "DoS slowloris",
-    "DoS Slowhttptest",
-    "PortScan",
-    "FTP-Patator",
-    "SSH-Patator",
-    "Bot",
-    "Web Attack - Brute Force",
-    "Web Attack - XSS",
-    "Web Attack - Sql Injection",
-    "Infiltration",
-    "Heartbleed",
-]
-
-# Distribution: ~80% benign, rest split among attacks
-ATTACK_WEIGHTS = {
-    "BENIGN": 0.80,
-    "DDoS": 0.05,
-    "DoS Hulk": 0.04,
-    "PortScan": 0.035,
-    "DoS GoldenEye": 0.015,
-    "DoS slowloris": 0.01,
-    "DoS Slowhttptest": 0.01,
-    "FTP-Patator": 0.008,
-    "SSH-Patator": 0.007,
-    "Bot": 0.008,
-    "Web Attack - Brute Force": 0.005,
-    "Web Attack - XSS": 0.003,
-    "Web Attack - Sql Injection": 0.002,
-    "Infiltration": 0.005,
-    "Heartbleed": 0.002,
+PROTOCOL_MAP = {"icmp": 0.0, "tcp": 1.0, "udp": 2.0}
+SERVICE_MAP = {
+    "http": 21,
+    "ftp": 16,
+    "ftp_data": 17,
+    "smtp": 52,
+    "ssh": 54,
+    "telnet": 58,
+    "private": 47,
+    "domain_u": 9,
+    "other": 42,
+    "eco_i": 11,
 }
+FLAG_MAP = {"SF": 9, "S0": 5, "REJ": 1, "RSTO": 2, "SH": 10}
 
-# Timestamp days matching CICIDS2017 collection schedule
-DAYS = [
-    "3/7/2017",   # Monday
-    "4/7/2017",   # Tuesday
-    "5/7/2017",   # Wednesday
-    "6/7/2017",   # Thursday
-    "7/7/2017",   # Friday
+ATTACK_TYPES = ["BENIGN", "DoS", "Probe", "R2L", "U2R"]
+ATTACK_WEIGHTS = [0.67, 0.18, 0.08, 0.05, 0.02]
+
+NSL_COLUMNS = [
+    "duration",
+    "protocol_type",
+    "service",
+    "flag",
+    "src_bytes",
+    "dst_bytes",
+    "land",
+    "wrong_fragment",
+    "urgent",
+    "hot",
+    "num_failed_logins",
+    "logged_in",
+    "num_compromised",
+    "root_shell",
+    "su_attempted",
+    "num_root",
+    "num_file_creations",
+    "num_shells",
+    "num_access_files",
+    "num_outbound_cmds",
+    "is_host_login",
+    "is_guest_login",
+    "count",
+    "srv_count",
+    "serror_rate",
+    "srv_serror_rate",
+    "rerror_rate",
+    "srv_rerror_rate",
+    "same_srv_rate",
+    "diff_srv_rate",
+    "srv_diff_host_rate",
+    "dst_host_count",
+    "dst_host_srv_count",
+    "dst_host_same_srv_rate",
+    "dst_host_diff_srv_rate",
+    "dst_host_same_src_port_rate",
+    "dst_host_srv_diff_host_rate",
+    "dst_host_serror_rate",
+    "dst_host_srv_serror_rate",
+    "dst_host_rerror_rate",
+    "dst_host_srv_rerror_rate",
+    "label",
 ]
 
-IPS = [
-    "192.168.10.1", "192.168.10.5", "192.168.10.8", "192.168.10.12",
-    "192.168.10.14", "192.168.10.15", "192.168.10.25", "192.168.10.50",
-    "172.16.0.1", "172.16.0.5", "205.174.165.68", "205.174.165.73",
-]
 
-
-def generate_benign_row() -> dict[str, str]:
-    """Generate a benign flow with typical web traffic characteristics."""
+def _row(
+    duration,
+    protocol,
+    service,
+    flag,
+    src_b,
+    dst_b,
+    logged_in,
+    count,
+    srv_count,
+    serr,
+    rerr,
+    same_srv,
+    diff_srv,
+    dst_cnt,
+    dst_srv_cnt,
+    dst_same_srv,
+    label,
+):
     return {
-        " Destination Port": str(random.choice([80, 443, 8080, 53, 22, 25])),
-        " Flow Duration": str(random.randint(0, 120000000)),
-        " Total Fwd Packets": str(random.randint(1, 50)),
-        " Total Backward Packets": str(random.randint(0, 40)),
-        "Total Length of Fwd Packets": str(random.uniform(0, 50000)),
-        " Total Length of Bwd Packets": str(random.uniform(0, 100000)),
-        "Fwd Packet Length Max": str(random.uniform(0, 1500)),
-        " Fwd Packet Length Min": str(random.uniform(0, 100)),
-        " Fwd Packet Length Mean": str(random.uniform(0, 750)),
-        " Fwd Packet Length Std": str(random.uniform(0, 500)),
-        "Bwd Packet Length Max": str(random.uniform(0, 1500)),
-        " Bwd Packet Length Min": str(random.uniform(0, 100)),
-        " Bwd Packet Length Mean": str(random.uniform(0, 750)),
-        " Bwd Packet Length Std": str(random.uniform(0, 500)),
-        "Flow Bytes/s": str(random.uniform(0, 1000000)),
-        " Flow Packets/s": str(random.uniform(0, 50000)),
-        " FIN Flag Count": str(random.choice([0, 0, 0, 1])),
-        " SYN Flag Count": str(random.choice([0, 1])),
-        " RST Flag Count": str(random.choice([0, 0, 0, 0, 1])),
-        " PSH Flag Count": str(random.choice([0, 0, 1])),
-        " ACK Flag Count": str(random.choice([0, 1])),
-        " URG Flag Count": str(0),
-        "Flow IAT Mean": str(random.uniform(0, 5000000)),
-        " Flow IAT Std": str(random.uniform(0, 3000000)),
-        " Flow IAT Max": str(random.uniform(0, 10000000)),
-        " Flow IAT Min": str(random.uniform(0, 100000)),
-        "Fwd IAT Mean": str(random.uniform(0, 5000000)),
-        " Fwd IAT Std": str(random.uniform(0, 3000000)),
-        " Fwd IAT Max": str(random.uniform(0, 10000000)),
-        " Fwd IAT Min": str(random.uniform(0, 100000)),
-        "Bwd IAT Mean": str(random.uniform(0, 5000000)),
-        " Bwd IAT Std": str(random.uniform(0, 3000000)),
-        " Bwd IAT Max": str(random.uniform(0, 10000000)),
-        " Bwd IAT Min": str(random.uniform(0, 100000)),
-        " Down/Up Ratio": str(random.uniform(0, 5)),
-        " Average Packet Size": str(random.uniform(0, 1000)),
-        " Avg Fwd Segment Size": str(random.uniform(0, 750)),
-        " Avg Bwd Segment Size": str(random.uniform(0, 750)),
+        "duration": duration,
+        "protocol_type": PROTOCOL_MAP.get(protocol, 1.0),
+        "service": SERVICE_MAP.get(service, 42),
+        "flag": FLAG_MAP.get(flag, 9),
+        "src_bytes": src_b,
+        "dst_bytes": dst_b,
+        "land": 0,
+        "wrong_fragment": random.choice([0, 0, 0, 1]),
+        "urgent": 0,
+        "hot": random.randint(0, 5),
+        "num_failed_logins": 0,
+        "logged_in": logged_in,
+        "num_compromised": 0,
+        "root_shell": 0,
+        "su_attempted": 0,
+        "num_root": 0,
+        "num_file_creations": 0,
+        "num_shells": 0,
+        "num_access_files": 0,
+        "num_outbound_cmds": 0,
+        "is_host_login": 0,
+        "is_guest_login": 0,
+        "count": count,
+        "srv_count": srv_count,
+        "serror_rate": serr,
+        "srv_serror_rate": serr,
+        "rerror_rate": rerr,
+        "srv_rerror_rate": rerr,
+        "same_srv_rate": same_srv,
+        "diff_srv_rate": diff_srv,
+        "srv_diff_host_rate": round(random.uniform(0, 0.1), 3),
+        "dst_host_count": dst_cnt,
+        "dst_host_srv_count": dst_srv_cnt,
+        "dst_host_same_srv_rate": dst_same_srv,
+        "dst_host_diff_srv_rate": round(1 - dst_same_srv, 3),
+        "dst_host_same_src_port_rate": round(random.uniform(0, 1), 3),
+        "dst_host_srv_diff_host_rate": round(random.uniform(0, 0.1), 3),
+        "dst_host_serror_rate": serr,
+        "dst_host_srv_serror_rate": serr,
+        "dst_host_rerror_rate": rerr,
+        "dst_host_srv_rerror_rate": rerr,
+        "label": label,
     }
 
 
-def generate_attack_row(attack_type: str) -> dict[str, str]:
-    """Generate an attack flow with characteristics specific to the attack type."""
-    row = generate_benign_row()
+def benign():
+    dur = random.randint(0, 200)
+    return _row(
+        duration=dur,
+        protocol="tcp",
+        service="http",
+        flag="SF",
+        src_b=random.randint(0, 10000),
+        dst_b=random.randint(0, 50000),
+        logged_in=1,
+        count=random.randint(1, 100),
+        srv_count=random.randint(1, 80),
+        serr=0.0,
+        rerr=0.0,
+        same_srv=round(random.uniform(0.7, 1.0), 3),
+        diff_srv=round(random.uniform(0.0, 0.3), 3),
+        dst_cnt=random.randint(1, 255),
+        dst_srv_cnt=random.randint(1, 200),
+        dst_same_srv=round(random.uniform(0.5, 1.0), 3),
+        label="BENIGN",
+    )
 
-    if attack_type.startswith("DDoS") or attack_type.startswith("DoS"):
-        # High packet rates, short flows
-        row[" Total Fwd Packets"] = str(random.randint(100, 10000))
-        row[" Flow Packets/s"] = str(random.uniform(50000, 500000))
-        row["Flow Bytes/s"] = str(random.uniform(1000000, 50000000))
-        row[" Flow Duration"] = str(random.randint(0, 5000000))
-        row[" SYN Flag Count"] = str(random.choice([1, 1, 1, 0]))
-        row[" Destination Port"] = str(80)
-    elif attack_type == "PortScan":
-        # Many short flows to different ports
-        row[" Destination Port"] = str(random.randint(1, 65535))
-        row[" Total Fwd Packets"] = str(random.randint(1, 5))
-        row[" Total Backward Packets"] = str(random.randint(0, 2))
-        row[" Flow Duration"] = str(random.randint(0, 1000000))
-        row[" SYN Flag Count"] = str(1)
-        row[" RST Flag Count"] = str(random.choice([0, 1]))
-    elif "Patator" in attack_type:
-        # Brute force: many connection attempts
-        row[" Destination Port"] = str(21 if "FTP" in attack_type else 22)
-        row[" Total Fwd Packets"] = str(random.randint(5, 50))
-        row[" Flow Duration"] = str(random.randint(1000000, 30000000))
-    elif attack_type == "Bot":
-        # Periodic, consistent patterns
-        row[" Flow Duration"] = str(random.randint(10000000, 120000000))
-        row["Flow IAT Mean"] = str(random.uniform(100000, 1000000))
-        row[" Flow IAT Std"] = str(random.uniform(0, 50000))
-    elif attack_type.startswith("Web Attack"):
-        row[" Destination Port"] = str(80)
-        row[" Total Fwd Packets"] = str(random.randint(10, 200))
-        row[" PSH Flag Count"] = str(1)
 
+def dos():
+    return _row(
+        duration=random.randint(0, 5),
+        protocol="tcp",
+        service="http",
+        flag="S0",
+        src_b=random.randint(0, 500),
+        dst_b=0,
+        logged_in=0,
+        count=random.randint(300, 511),
+        srv_count=random.randint(200, 511),
+        serr=round(random.uniform(0.8, 1.0), 3),
+        rerr=0.0,
+        same_srv=round(random.uniform(0.9, 1.0), 3),
+        diff_srv=round(random.uniform(0.0, 0.1), 3),
+        dst_cnt=255,
+        dst_srv_cnt=255,
+        dst_same_srv=round(random.uniform(0.9, 1.0), 3),
+        label="DoS",
+    )
+
+
+def probe():
+    services = list(SERVICE_MAP.keys())
+    return _row(
+        duration=random.randint(0, 2),
+        protocol=random.choice(["tcp", "udp"]),
+        service=random.choice(services),
+        flag=random.choice(["SF", "S0", "REJ"]),
+        src_b=random.randint(0, 1000),
+        dst_b=random.randint(0, 500),
+        logged_in=0,
+        count=random.randint(1, 50),
+        srv_count=random.randint(1, 20),
+        serr=round(random.uniform(0.0, 0.5), 3),
+        rerr=round(random.uniform(0.0, 0.5), 3),
+        same_srv=round(random.uniform(0.0, 0.3), 3),
+        diff_srv=round(random.uniform(0.5, 1.0), 3),
+        dst_cnt=random.randint(100, 255),
+        dst_srv_cnt=random.randint(50, 255),
+        dst_same_srv=round(random.uniform(0.0, 0.3), 3),
+        label="Probe",
+    )
+
+
+def r2l():
+    return _row(
+        duration=random.randint(1, 100),
+        protocol="tcp",
+        service=random.choice(["ftp", "telnet", "smtp"]),
+        flag="SF",
+        src_b=random.randint(100, 5000),
+        dst_b=random.randint(100, 5000),
+        logged_in=random.choice([0, 1]),
+        count=random.randint(1, 10),
+        srv_count=random.randint(1, 10),
+        serr=0.0,
+        rerr=0.0,
+        same_srv=round(random.uniform(0.5, 1.0), 3),
+        diff_srv=round(random.uniform(0.0, 0.5), 3),
+        dst_cnt=random.randint(1, 50),
+        dst_srv_cnt=random.randint(1, 50),
+        dst_same_srv=round(random.uniform(0.5, 1.0), 3),
+        label="R2L",
+    )
+
+
+def u2r():
+    row = _row(
+        duration=random.randint(0, 10),
+        protocol="tcp",
+        service="telnet",
+        flag="SF",
+        src_b=random.randint(0, 2000),
+        dst_b=random.randint(0, 2000),
+        logged_in=1,
+        count=random.randint(1, 5),
+        srv_count=random.randint(1, 5),
+        serr=0.0,
+        rerr=0.0,
+        same_srv=round(random.uniform(0.5, 1.0), 3),
+        diff_srv=round(random.uniform(0.0, 0.5), 3),
+        dst_cnt=random.randint(1, 20),
+        dst_srv_cnt=random.randint(1, 20),
+        dst_same_srv=round(random.uniform(0.5, 1.0), 3),
+        label="U2R",
+    )
+    row["root_shell"] = random.choice([0, 1])
+    row["num_compromised"] = random.randint(0, 10)
     return row
 
 
+GENERATORS = {
+    "BENIGN": benign,
+    "DoS": dos,
+    "Probe": probe,
+    "R2L": r2l,
+    "U2R": u2r,
+}
+
+
 def generate_fixture(output_path: Path, num_rows: int = 3000) -> None:
-    """Generate the fixture CSV file."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    labels = list(ATTACK_WEIGHTS.keys())
-    weights = list(ATTACK_WEIGHTS.values())
-
-    all_columns = ID_COLUMNS + COLUMNS
-
+    labels = list(GENERATORS.keys())
     with open(output_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=all_columns)
+        writer = csv.DictWriter(f, fieldnames=NSL_COLUMNS)
         writer.writeheader()
-
-        for i in range(num_rows):
-            label = random.choices(labels, weights=weights, k=1)[0]
-            day_idx = min(i * len(DAYS) // num_rows, len(DAYS) - 1)
-            day = DAYS[day_idx]
-            hour = random.randint(8, 17)
-            minute = random.randint(0, 59)
-            second = random.randint(0, 59)
-            timestamp = f"{day} {hour}:{minute:02d}:{second:02d}"
-
-            src_ip = random.choice(IPS[:8])
-            dst_ip = random.choice(IPS[8:])
-            src_port = random.randint(1024, 65535)
-            protocol = random.choice([6, 17])  # TCP or UDP
-
-            row = generate_benign_row() if label == "BENIGN" else generate_attack_row(label)
-
-            row[" Label"] = label
-            row["Flow ID"] = f"{src_ip}-{dst_ip}-{src_port}-{row[' Destination Port']}-{protocol}"
-            row[" Source IP"] = src_ip
-            row[" Source Port"] = str(src_port)
-            row[" Destination IP"] = dst_ip
-            row[" Protocol"] = str(protocol)
-            row[" Timestamp"] = timestamp
-
-            writer.writerow(row)
+        for _ in range(num_rows):
+            label = random.choices(labels, weights=ATTACK_WEIGHTS, k=1)[0]
+            writer.writerow(GENERATORS[label]())
 
 
 if __name__ == "__main__":
-    fixture_path = Path(__file__).resolve().parents[4] / "data" / "fixtures" / "cicids2017_sample.csv"
+    fixture_path = (
+        Path(__file__).resolve().parents[4] / "data" / "fixtures" / "nsl_kdd_sample.csv"
+    )
     generate_fixture(fixture_path)
-    print(f"Generated fixture at {fixture_path}")
+    print(f"Generated NSL-KDD fixture at {fixture_path}")
