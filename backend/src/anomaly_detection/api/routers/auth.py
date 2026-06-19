@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Request
@@ -117,7 +119,7 @@ async def login(request: Request, body: LoginRequest) -> TokenResponse:
 
 
 @router.post("/register")
-async def register(request: Request, body: RegisterRequest) -> dict:
+async def register(request: Request, body: RegisterRequest) -> dict[str, Any]:
     """Register a new user account."""
     session_factory = request.app.state.session_factory
 
@@ -148,7 +150,7 @@ async def register(request: Request, body: RegisterRequest) -> dict:
 
 
 @router.post("/forgot-password")
-async def forgot_password(body: ForgotPasswordRequest) -> dict:
+async def forgot_password(body: ForgotPasswordRequest) -> dict[str, Any]:
     """Send password reset instructions (mock implementation for demo)."""
     # In production, this would send an email with reset link
     return {
@@ -194,6 +196,6 @@ async def refresh_token(request: Request, body: RefreshRequest) -> TokenResponse
 
 
 @router.post("/logout")
-async def logout() -> dict:
+async def logout() -> dict[str, Any]:
     """Logout — client should discard tokens."""
     return {"message": "Logged out successfully"}

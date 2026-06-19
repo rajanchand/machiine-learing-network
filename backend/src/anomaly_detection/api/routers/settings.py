@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from starlette.responses import Response
 from sqlalchemy import select
 
 from anomaly_detection.authentication import hash_password, verify_password
@@ -18,7 +21,7 @@ router = APIRouter(prefix="/api/v1/settings", tags=["settings"])
 
 
 @router.get("")
-async def get_settings(request: Request) -> list[dict]:
+async def get_settings(request: Request) -> list[dict[str, Any]]:
     """Get all system settings."""
     session_factory = request.app.state.session_factory
 
@@ -66,7 +69,7 @@ async def get_settings(request: Request) -> list[dict]:
 
 
 @router.put("")
-async def update_settings(request: Request, body: SettingUpdateRequest) -> dict:
+async def update_settings(request: Request, body: SettingUpdateRequest) -> dict[str, Any]:
     """Update system settings."""
     session_factory = request.app.state.session_factory
 
@@ -85,7 +88,7 @@ async def update_settings(request: Request, body: SettingUpdateRequest) -> dict:
 
 
 @router.put("/password")
-async def change_password(request: Request, body: ChangePasswordRequest) -> dict:
+async def change_password(request: Request, body: ChangePasswordRequest) -> Response | dict[str, Any]:
     """Change user password."""
     session_factory = request.app.state.session_factory
 
@@ -114,7 +117,7 @@ async def change_password(request: Request, body: ChangePasswordRequest) -> dict
 
 
 @router.get("/api")
-async def api_settings(request: Request) -> dict:
+async def api_settings(request: Request) -> dict[str, Any]:
     """Get API configuration info."""
     settings = request.app.state.settings
     return {

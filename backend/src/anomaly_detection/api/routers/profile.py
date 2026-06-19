@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from starlette.responses import Response
 from sqlalchemy import select
 
 from anomaly_detection.db.models import AuditLog, User
@@ -13,7 +16,7 @@ router = APIRouter(prefix="/api/v1/profile", tags=["profile"])
 
 
 @router.get("")
-async def get_profile(request: Request) -> dict:
+async def get_profile(request: Request) -> Response | dict[str, Any]:
     """Get current user profile."""
     session_factory = request.app.state.session_factory
     user_info = getattr(request.state, "user", None)
@@ -43,7 +46,7 @@ async def get_profile(request: Request) -> dict:
 
 
 @router.put("")
-async def update_profile(request: Request, body: dict) -> dict:
+async def update_profile(request: Request, body: dict[str, Any]) -> Response | dict[str, Any]:
     """Update user profile."""
     session_factory = request.app.state.session_factory
     user_info = getattr(request.state, "user", None)
@@ -72,7 +75,7 @@ async def update_profile(request: Request, body: dict) -> dict:
 
 
 @router.get("/activity")
-async def user_activity(request: Request) -> list[dict]:
+async def user_activity(request: Request) -> Response | list[dict[str, Any]]:
     """Get user's recent activity log."""
     session_factory = request.app.state.session_factory
     user_info = getattr(request.state, "user", None)

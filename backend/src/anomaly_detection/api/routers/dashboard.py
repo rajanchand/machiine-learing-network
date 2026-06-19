@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from datetime import UTC, datetime, timedelta
 
 import psutil
@@ -146,7 +148,7 @@ async def get_recent_predictions(request: Request) -> list[RecentPrediction]:
 
 
 @router.get("/system-health")
-async def get_system_health(request: Request) -> dict:
+async def get_system_health(request: Request) -> dict[str, Any]:
     """Get system health metrics."""
     cpu = psutil.cpu_percent(interval=0.1)
     memory = psutil.virtual_memory()
@@ -164,7 +166,7 @@ async def get_system_health(request: Request) -> dict:
 
 
 @router.get("/charts/traffic")
-async def get_traffic_chart(request: Request) -> list[dict]:
+async def get_traffic_chart(request: Request) -> list[dict[str, Any]]:
     """Get traffic data for line chart (last 24 hours, hourly)."""
     session_factory = request.app.state.session_factory
     now = datetime.now(UTC)
@@ -193,7 +195,7 @@ async def get_traffic_chart(request: Request) -> list[dict]:
 
 
 @router.get("/charts/protocols")
-async def get_protocol_chart(request: Request) -> list[dict]:
+async def get_protocol_chart(request: Request) -> list[dict[str, Any]]:
     """Get protocol distribution for pie chart."""
     session_factory = request.app.state.session_factory
 
@@ -212,7 +214,7 @@ async def get_protocol_chart(request: Request) -> list[dict]:
 
 
 @router.get("/charts/attacks")
-async def get_attack_chart(request: Request) -> list[dict]:
+async def get_attack_chart(request: Request) -> list[dict[str, Any]]:
     """Get attack type distribution for bar chart."""
     session_factory = request.app.state.session_factory
 

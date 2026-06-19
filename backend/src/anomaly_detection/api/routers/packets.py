@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import csv
 import io
 import random
@@ -18,7 +20,7 @@ router = APIRouter(prefix="/api/v1/packets", tags=["packets"])
 
 
 @router.post("/capture/start", response_model=PacketCaptureResponse)
-async def start_capture(request: Request, body: dict | None = None) -> PacketCaptureResponse:
+async def start_capture(request: Request, body: dict[str, Any] | None = None) -> PacketCaptureResponse:
     """Start a packet capture session."""
     session_factory = request.app.state.session_factory
     interface = (body or {}).get("interface", "eth0")
@@ -67,7 +69,7 @@ async def start_capture(request: Request, body: dict | None = None) -> PacketCap
 
 
 @router.post("/capture/stop")
-async def stop_capture(request: Request, body: dict | None = None) -> dict:
+async def stop_capture(request: Request, body: dict[str, Any] | None = None) -> dict[str, Any]:
     """Stop a running packet capture session."""
     session_factory = request.app.state.session_factory
     capture_id = (body or {}).get("capture_id")
@@ -104,7 +106,7 @@ async def list_packets(
     protocol: str | None = None,
     status: str | None = None,
     search: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """List captured packets with pagination, filtering, and search."""
     session_factory = request.app.state.session_factory
 

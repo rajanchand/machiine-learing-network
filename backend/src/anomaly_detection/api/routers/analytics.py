@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import random
 from datetime import UTC, datetime, timedelta
 
@@ -14,7 +16,7 @@ router = APIRouter(prefix="/api/v1/analytics", tags=["analytics"])
 
 
 @router.get("/traffic-trends")
-async def traffic_trends(request: Request) -> list[dict]:
+async def traffic_trends(request: Request) -> list[dict[str, Any]]:
     """Get traffic volume over the last 7 days."""
     session_factory = request.app.state.session_factory
     now = datetime.now(UTC)
@@ -44,7 +46,7 @@ async def traffic_trends(request: Request) -> list[dict]:
 
 
 @router.get("/attack-trends")
-async def attack_trends(request: Request) -> list[dict]:
+async def attack_trends(request: Request) -> list[dict[str, Any]]:
     """Get attack counts over the last 7 days."""
     session_factory = request.app.state.session_factory
     now = datetime.now(UTC)
@@ -74,7 +76,7 @@ async def attack_trends(request: Request) -> list[dict]:
 
 
 @router.get("/protocol-usage")
-async def protocol_usage(request: Request) -> list[dict]:
+async def protocol_usage(request: Request) -> list[dict[str, Any]]:
     """Get protocol distribution."""
     session_factory = request.app.state.session_factory
 
@@ -104,7 +106,7 @@ async def protocol_usage(request: Request) -> list[dict]:
 
 
 @router.get("/top-attackers")
-async def top_attackers(request: Request) -> list[dict]:
+async def top_attackers(request: Request) -> list[dict[str, Any]]:
     """Get top attacking IP addresses."""
     session_factory = request.app.state.session_factory
 
@@ -133,7 +135,7 @@ async def top_attackers(request: Request) -> list[dict]:
 
 
 @router.get("/top-ports")
-async def top_ports(request: Request) -> list[dict]:
+async def top_ports(request: Request) -> list[dict[str, Any]]:
     """Get top destination ports targeted."""
     session_factory = request.app.state.session_factory
 
@@ -164,7 +166,7 @@ async def top_ports(request: Request) -> list[dict]:
 
 
 @router.get("/model-metrics")
-async def model_metrics(request: Request) -> list[dict]:
+async def model_metrics(request: Request) -> list[dict[str, Any]]:
     """Get accuracy, precision, recall, F1 for all models."""
     session_factory = request.app.state.session_factory
 
@@ -223,7 +225,7 @@ async def model_metrics(request: Request) -> list[dict]:
 
 
 @router.get("/confusion-matrix/{model_name}")
-async def confusion_matrix(request: Request, model_name: str) -> dict:
+async def confusion_matrix(request: Request, model_name: str) -> dict[str, Any]:
     """Get confusion matrix data for a model."""
     # Demo data
     return {
@@ -239,7 +241,7 @@ async def confusion_matrix(request: Request, model_name: str) -> dict:
 
 
 @router.get("/roc-curve/{model_name}")
-async def roc_curve(request: Request, model_name: str) -> dict:
+async def roc_curve(request: Request, model_name: str) -> dict[str, Any]:
     """Get ROC curve data points for a model."""
     # Generate smooth ROC curve
     fpr = [0.0, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.6, 0.8, 1.0]

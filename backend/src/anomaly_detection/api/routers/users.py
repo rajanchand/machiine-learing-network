@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import contextlib
+from typing import Any
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
+from starlette.responses import Response
 from sqlalchemy import func, select
 
 from anomaly_detection.authentication import hash_password
@@ -21,7 +23,7 @@ async def list_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=1, le=100),
     search: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """List all users (admin only)."""
     session_factory = request.app.state.session_factory
 
@@ -68,7 +70,7 @@ async def list_users(
 
 
 @router.post("")
-async def create_user(request: Request, body: UserCreateRequest) -> dict:
+async def create_user(request: Request, body: UserCreateRequest) -> Response | dict[str, Any]:
     """Create a new user."""
     session_factory = request.app.state.session_factory
 
@@ -117,7 +119,7 @@ async def create_user(request: Request, body: UserCreateRequest) -> dict:
 
 
 @router.put("/{user_id}")
-async def update_user(request: Request, user_id: str, body: UserUpdateRequest) -> dict:
+async def update_user(request: Request, user_id: str, body: UserUpdateRequest) -> Response | dict[str, Any]:
     """Update user details."""
     session_factory = request.app.state.session_factory
 
@@ -146,7 +148,7 @@ async def update_user(request: Request, user_id: str, body: UserUpdateRequest) -
 
 
 @router.delete("/{user_id}")
-async def delete_user(request: Request, user_id: str) -> dict:
+async def delete_user(request: Request, user_id: str) -> Response | dict[str, Any]:
     """Delete a user."""
     session_factory = request.app.state.session_factory
 
@@ -163,7 +165,7 @@ async def delete_user(request: Request, user_id: str) -> dict:
 
 
 @router.patch("/{user_id}/role")
-async def assign_role(request: Request, user_id: str, body: dict) -> dict:
+async def assign_role(request: Request, user_id: str, body: dict[str, Any]) -> Response | dict[str, Any]:
     """Assign a role to a user."""
     session_factory = request.app.state.session_factory
     role_value = body.get("role", "analyst")
@@ -185,7 +187,7 @@ async def assign_role(request: Request, user_id: str, body: dict) -> dict:
 
 
 @router.patch("/{user_id}/status")
-async def toggle_status(request: Request, user_id: str, body: dict) -> dict:
+async def toggle_status(request: Request, user_id: str, body: dict[str, Any]) -> Response | dict[str, Any]:
     """Activate or deactivate a user."""
     session_factory = request.app.state.session_factory
     status_value = body.get("status", "active")

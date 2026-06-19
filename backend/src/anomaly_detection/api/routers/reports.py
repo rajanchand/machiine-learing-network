@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import csv
 import io
 import os
@@ -10,6 +12,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.responses import Response
 from sqlalchemy import func, select
 
 from anomaly_detection.db.models import Alert, Attack, Packet, Prediction, Report
@@ -19,7 +22,7 @@ router = APIRouter(prefix="/api/v1/reports", tags=["reports"])
 
 
 @router.post("/generate")
-async def generate_report(request: Request, body: ReportGenerateRequest) -> dict:
+async def generate_report(request: Request, body: ReportGenerateRequest) -> dict[str, Any]:
     """Generate a report in specified format."""
     session_factory = request.app.state.session_factory
     settings = request.app.state.settings
@@ -102,7 +105,7 @@ async def generate_report(request: Request, body: ReportGenerateRequest) -> dict
 
 
 @router.get("")
-async def list_reports(request: Request) -> list[dict]:
+async def list_reports(request: Request) -> list[dict[str, Any]]:
     """List all generated reports."""
     session_factory = request.app.state.session_factory
 
@@ -123,7 +126,7 @@ async def list_reports(request: Request) -> list[dict]:
 
 
 @router.get("/{report_id}/download")
-async def download_report(request: Request, report_id: str) -> FileResponse:
+async def download_report(request: Request, report_id: str) -> Response:
     """Download a generated report."""
     session_factory = request.app.state.session_factory
 
@@ -144,7 +147,7 @@ async def download_report(request: Request, report_id: str) -> FileResponse:
 
 
 @router.delete("/{report_id}")
-async def delete_report(request: Request, report_id: str) -> dict:
+async def delete_report(request: Request, report_id: str) -> Response | dict[str, Any]:
     """Delete a report."""
     session_factory = request.app.state.session_factory
 

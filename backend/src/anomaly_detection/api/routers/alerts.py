@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
+from starlette.responses import Response
 from sqlalchemy import func, select
 
 from anomaly_detection.db.models import Alert, AlertSeverity, AlertStatus
@@ -22,7 +25,7 @@ async def list_alerts(
     severity: str | None = None,
     status: str | None = None,
     search: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """List alerts with pagination and filtering."""
     session_factory = request.app.state.session_factory
 
@@ -76,7 +79,7 @@ async def list_alerts(
 
 
 @router.get("/count")
-async def alert_counts(request: Request) -> dict:
+async def alert_counts(request: Request) -> dict[str, Any]:
     """Get counts by severity and status."""
     session_factory = request.app.state.session_factory
 
@@ -111,7 +114,7 @@ async def alert_counts(request: Request) -> dict:
 
 
 @router.put("/{alert_id}")
-async def update_alert(request: Request, alert_id: str, body: AlertUpdateRequest) -> dict:
+async def update_alert(request: Request, alert_id: str, body: AlertUpdateRequest) -> Response | dict[str, Any]:
     """Update alert status or read state."""
     session_factory = request.app.state.session_factory
 
@@ -137,7 +140,7 @@ async def update_alert(request: Request, alert_id: str, body: AlertUpdateRequest
 
 
 @router.post("/mark-all-read")
-async def mark_all_read(request: Request) -> dict:
+async def mark_all_read(request: Request) -> dict[str, Any]:
     """Mark all alerts as read."""
     session_factory = request.app.state.session_factory
 

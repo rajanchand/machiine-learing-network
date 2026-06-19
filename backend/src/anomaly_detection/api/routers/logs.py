@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import csv
 import io
 
@@ -32,7 +34,7 @@ async def login_logs(
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=1, le=100),
     search: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Get login audit logs."""
     session_factory = request.app.state.session_factory
 
@@ -76,7 +78,7 @@ async def packet_logs(
     request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=1, le=100),
-) -> dict:
+) -> dict[str, Any]:
     """Get packet capture logs."""
     session_factory = request.app.state.session_factory
 
@@ -113,7 +115,7 @@ async def attack_logs(
     request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=1, le=100),
-) -> dict:
+) -> dict[str, Any]:
     """Get attack detection logs."""
     session_factory = request.app.state.session_factory
 
@@ -150,7 +152,7 @@ async def prediction_logs(
     request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=1, le=100),
-) -> dict:
+) -> dict[str, Any]:
     """Get ML prediction logs."""
     session_factory = request.app.state.session_factory
 
@@ -187,7 +189,7 @@ async def system_logs(
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=1, le=100),
     level: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Get system event logs."""
     session_factory = request.app.state.session_factory
 
@@ -229,7 +231,7 @@ async def audit_logs(
     request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=1, le=100),
-) -> dict:
+) -> dict[str, Any]:
     """Get user action audit logs."""
     session_factory = request.app.state.session_factory
 

@@ -6,7 +6,7 @@ import random
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -189,12 +189,12 @@ def create_app() -> FastAPI:
     # Health check
     @app.get("/health", tags=["system"])
     @app.get("/api/health", tags=["system"])
-    async def health_check() -> dict:
+    async def health_check() -> dict[str, Any]:
         return {"status": "ok"}
 
     @app.get("/ready", tags=["system"])
     @app.get("/api/ready", tags=["system"])
-    async def readiness_check() -> dict:
+    async def readiness_check() -> dict[str, Any]:
         try:
             async with app.state.session_factory() as session:
                 await session.execute(text("SELECT 1"))
@@ -205,7 +205,7 @@ def create_app() -> FastAPI:
     # Simulator scenario endpoints
     @app.post("/simulate", include_in_schema=False)
     @app.post("/api/simulate", include_in_schema=False)
-    async def set_simulate_scenario(payload: dict) -> dict:
+    async def set_simulate_scenario(payload: dict[str, Any]) -> dict[str, Any]:
         scenario = payload.get("scenario")
         if scenario not in ["port_scan", "ddos", "brute_force", None, ""]:
             raise HTTPException(status_code=400, detail="Invalid scenario")
@@ -214,12 +214,12 @@ def create_app() -> FastAPI:
 
     @app.get("/simulate", include_in_schema=False)
     @app.get("/api/simulate", include_in_schema=False)
-    async def get_simulate_scenario() -> dict:
+    async def get_simulate_scenario() -> dict[str, Any]:
         return {"active_scenario": getattr(app.state, "active_scenario", None)}
 
     # Seed demo data endpoint
     @app.post("/api/v1/seed", tags=["system"])
-    async def seed_demo_data() -> dict:
+    async def seed_demo_data() -> dict[str, Any]:
         """Seed the database with demo data for demonstration."""
         session_factory = app.state.session_factory
 
@@ -323,7 +323,7 @@ def create_app() -> FastAPI:
             # Seed Attacks
             result = await session.execute(select(func.count(Attack.id)))
             if (result.scalar() or 0) < 20:
-                attack_types = [
+                attack_types: list[tuple[str, AlertSeverity, str]] = [
                     ("DDoS", AlertSeverity.CRITICAL, "Block source IP and enable rate limiting"),
                     ("DoS", AlertSeverity.HIGH, "Enable SYN cookies and rate limit connections"),
                     (
@@ -348,19 +348,20 @@ def create_app() -> FastAPI:
                     ("FTP Attack", AlertSeverity.MEDIUM, "Disable FTP, switch to SFTP"),
                 ]
                 for _ in range(40):
-                    atype, severity, rec = random.choice(attack_types)
+                    atype, severity, rec_text = random.choice(attack_types)
                     ts = now - timedelta(hours=random.randint(0, 168))
+                    confidence_val = round(random.uniform(0.65, 0.99), 4)
                     session.add(
                         Attack(
                             attack_type=atype,
                             severity=severity,
-                            confidence=round(random.uniform(0.65, 0.99), 4),
+                            confidence=confidence_val,
                             src_ip=f"192.168.{random.randint(1, 20)}.{random.randint(1, 254)}",
                             dst_ip=f"10.0.{random.randint(0, 5)}.{random.randint(1, 254)}",
                             src_port=random.randint(1024, 65535),
                             dst_port=random.choice([22, 53, 80, 443, 3306, 8080]),
                             protocol=random.choice(["TCP", "UDP", "ICMP"]),
-                            recommendation=rec,
+                            recommendation=rec_text,
                             detected_at=ts,
                         )
                     )
@@ -484,14 +485,14 @@ def create_app() -> FastAPI:
 
         # Serve HTML pages
         @app.get("/", include_in_schema=False)
-        async def serve_index():
+        async def serve_index() -> Response:
             index = frontend_path / "index.html"
             if index.exists():
                 return FileResponse(str(index))
             raise HTTPException(status_code=404, detail="Frontend not found")
 
         @app.get("/{page_name}.html", include_in_schema=False)
-        async def serve_page(page_name: str):
+        async def serve_page(page_name: str) -> Response:
             page = frontend_path / f"{page_name}.html"
             if page.exists():
                 return FileResponse(str(page))

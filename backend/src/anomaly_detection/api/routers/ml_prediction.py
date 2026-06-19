@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import random
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
+from starlette.responses import Response
 from sqlalchemy import func, select
 
 from anomaly_detection.db.models import MLModel, ModelStatus, Prediction
@@ -21,7 +24,7 @@ router = APIRouter(prefix="/api/v1/ml", tags=["machine-learning"])
 
 
 @router.post("/predict")
-async def predict(request: Request, body: PredictRequest) -> dict:
+async def predict(request: Request, body: PredictRequest) -> dict[str, Any]:
     """Run real-time ML prediction on feature data."""
     session_factory = request.app.state.session_factory
 
@@ -66,7 +69,7 @@ async def predict(request: Request, body: PredictRequest) -> dict:
 
 
 @router.post("/predict/batch")
-async def batch_predict(request: Request) -> dict:
+async def batch_predict(request: Request) -> dict[str, Any]:
     """Batch prediction from uploaded CSV."""
     # For demo: return simulated batch results
     results = []
@@ -91,7 +94,7 @@ async def batch_predict(request: Request) -> dict:
 
 
 @router.post("/train")
-async def train_model(request: Request, body: TrainRequest) -> dict:
+async def train_model(request: Request, body: TrainRequest) -> Response | dict[str, Any]:
     """Train a new ML model."""
     session_factory = request.app.state.session_factory
 
@@ -173,7 +176,7 @@ async def train_model(request: Request, body: TrainRequest) -> dict:
 
 
 @router.post("/retrain/{model_name}")
-async def retrain_model(request: Request, model_name: str) -> dict:
+async def retrain_model(request: Request, model_name: str) -> Response | dict[str, Any]:
     """Retrain an existing model."""
     return await train_model(request, TrainRequest(model_type=model_name))
 
@@ -183,7 +186,7 @@ async def list_predictions(
     request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=1, le=100),
-) -> dict:
+) -> dict[str, Any]:
     """Get prediction history with pagination."""
     session_factory = request.app.state.session_factory
 
@@ -218,7 +221,7 @@ async def list_predictions(
 
 
 @router.get("/models")
-async def list_models(request: Request) -> list[dict]:
+async def list_models(request: Request) -> list[dict[str, Any]]:
     """List all registered ML models."""
     session_factory = request.app.state.session_factory
 
@@ -247,7 +250,7 @@ async def list_models(request: Request) -> list[dict]:
 
 
 @router.put("/models/{model_name}/activate")
-async def activate_model(request: Request, model_name: str) -> dict:
+async def activate_model(request: Request, model_name: str) -> Response | dict[str, Any]:
     """Set a model as the active model."""
     session_factory = request.app.state.session_factory
 
@@ -270,7 +273,7 @@ async def activate_model(request: Request, model_name: str) -> dict:
 
 
 @router.get("/feature-importance/{model_name}")
-async def feature_importance(request: Request, model_name: str) -> dict:
+async def feature_importance(request: Request, model_name: str) -> Response | dict[str, Any]:
     """Get feature importance scores for a model."""
     session_factory = request.app.state.session_factory
 
@@ -287,7 +290,7 @@ async def feature_importance(request: Request, model_name: str) -> dict:
 
 
 @router.post("/compare")
-async def compare_models(request: Request) -> list[dict]:
+async def compare_models(request: Request) -> list[dict[str, Any]]:
     """Compare all models' metrics."""
     session_factory = request.app.state.session_factory
 

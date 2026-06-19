@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
+from typing import Any
+
 import asyncio
 import random
 from datetime import UTC, datetime
@@ -12,7 +15,7 @@ from fastapi.responses import StreamingResponse
 router = APIRouter(prefix="/api/v1/monitoring", tags=["monitoring"])
 
 # In-memory monitoring state
-_monitoring_state = {
+_monitoring_state: dict[str, Any] = {
     "is_running": False,
     "interface": "eth0",
     "packet_count": 0,
@@ -23,7 +26,7 @@ _monitoring_state = {
 
 
 @router.post("/start")
-async def start_monitoring(request: Request, body: dict | None = None) -> dict:
+async def start_monitoring(request: Request, body: dict[str, Any] | None = None) -> dict[str, Any]:
     """Start live network monitoring."""
     interface = (body or {}).get("interface", "eth0")
     _monitoring_state["is_running"] = True
@@ -36,14 +39,14 @@ async def start_monitoring(request: Request, body: dict | None = None) -> dict:
 
 
 @router.post("/stop")
-async def stop_monitoring() -> dict:
+async def stop_monitoring() -> dict[str, Any]:
     """Stop live network monitoring."""
     _monitoring_state["is_running"] = False
     return {"message": "Monitoring stopped", "total_packets": _monitoring_state["packet_count"]}
 
 
 @router.get("/status")
-async def monitoring_status() -> dict:
+async def monitoring_status() -> dict[str, Any]:
     """Get current monitoring state."""
     return {
         "is_running": _monitoring_state["is_running"],
@@ -56,7 +59,7 @@ async def monitoring_status() -> dict:
 
 
 @router.get("/interfaces")
-async def list_interfaces() -> list[dict]:
+async def list_interfaces() -> list[dict[str, Any]]:
     """List available network interfaces."""
     # Return common interface names for demo
     interfaces = [
@@ -78,7 +81,7 @@ async def list_interfaces() -> list[dict]:
 
 
 @router.get("/stats")
-async def monitoring_stats() -> dict:
+async def monitoring_stats() -> dict[str, Any]:
     """Get live monitoring statistics."""
     protocols = {
         "TCP": random.randint(500, 2000),
@@ -103,7 +106,7 @@ async def monitoring_stats() -> dict:
 async def monitoring_feed(request: Request) -> StreamingResponse:
     """SSE endpoint for real-time packet stream (simulated for demo)."""
 
-    async def event_generator():
+    async def event_generator() -> AsyncGenerator[str, None]:
         protocols = ["TCP", "UDP", "ICMP", "HTTP", "HTTPS", "DNS", "SSH", "FTP"]
         while True:
             if not _monitoring_state["is_running"]:
@@ -111,7 +114,7 @@ async def monitoring_feed(request: Request) -> StreamingResponse:
                 await asyncio.sleep(2)
                 continue
 
-            _monitoring_state["packet_count"] += 1
+            _monitoring_state["packet_count"] = int(_monitoring_state["packet_count"]) + 1
             packet = {
                 "id": _monitoring_state["packet_count"],
                 "timestamp": datetime.now(UTC).isoformat(),
@@ -125,7 +128,7 @@ async def monitoring_feed(request: Request) -> StreamingResponse:
                     ["Normal", "Suspicious", "Malicious"], weights=[85, 10, 5]
                 )[0],
             }
-            _monitoring_state["incoming_bytes"] += packet["size"]
+            _monitoring_state["incoming_bytes"] = int(_monitoring_state["incoming_bytes"]) + packet["size"]
 
             import json
 

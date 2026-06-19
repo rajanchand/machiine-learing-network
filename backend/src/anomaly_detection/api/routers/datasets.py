@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import os
 import uuid
 
 import pandas as pd
 from fastapi import APIRouter, File, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.responses import Response
 from sqlalchemy import select
 
 from anomaly_detection.db.models import Dataset
@@ -20,7 +23,7 @@ router = APIRouter(prefix="/api/v1/datasets", tags=["datasets"])
 async def upload_dataset(
     request: Request,
     file: UploadFile = File(...),
-) -> dict:
+) -> Response | dict[str, Any]:
     """Upload a dataset CSV file."""
     settings = request.app.state.settings
     session_factory = request.app.state.session_factory
@@ -75,7 +78,7 @@ async def upload_dataset(
 
 
 @router.get("")
-async def list_datasets(request: Request) -> list[dict]:
+async def list_datasets(request: Request) -> list[dict[str, Any]]:
     """List all uploaded datasets."""
     session_factory = request.app.state.session_factory
 
@@ -98,7 +101,7 @@ async def list_datasets(request: Request) -> list[dict]:
 
 
 @router.get("/{dataset_id}")
-async def get_dataset(request: Request, dataset_id: str) -> dict:
+async def get_dataset(request: Request, dataset_id: str) -> Response | dict[str, Any]:
     """Get dataset details with preview."""
     session_factory = request.app.state.session_factory
 
@@ -129,7 +132,7 @@ async def get_dataset(request: Request, dataset_id: str) -> dict:
 
 
 @router.get("/{dataset_id}/download")
-async def download_dataset(request: Request, dataset_id: str) -> FileResponse:
+async def download_dataset(request: Request, dataset_id: str) -> Response:
     """Download a dataset file."""
     session_factory = request.app.state.session_factory
 
@@ -150,7 +153,7 @@ async def download_dataset(request: Request, dataset_id: str) -> FileResponse:
 
 
 @router.delete("/{dataset_id}")
-async def delete_dataset(request: Request, dataset_id: str) -> dict:
+async def delete_dataset(request: Request, dataset_id: str) -> Response | dict[str, Any]:
     """Delete a dataset."""
     session_factory = request.app.state.session_factory
 

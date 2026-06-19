@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
+from starlette.responses import Response
 from sqlalchemy import func, select
 
 from anomaly_detection.db.models import AlertSeverity, Attack, BlockedIP
@@ -20,7 +23,7 @@ async def list_attacks(
     attack_type: str | None = None,
     severity: str | None = None,
     search: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """List detected attacks with pagination and filtering."""
     session_factory = request.app.state.session_factory
 
@@ -72,7 +75,7 @@ async def list_attacks(
 
 
 @router.get("/{attack_id}")
-async def get_attack(request: Request, attack_id: str) -> dict:
+async def get_attack(request: Request, attack_id: str) -> Response | dict[str, Any]:
     """Get attack details."""
     session_factory = request.app.state.session_factory
 
@@ -99,7 +102,7 @@ async def get_attack(request: Request, attack_id: str) -> dict:
 
 
 @router.post("/block-ip")
-async def block_ip(request: Request, body: BlockIPRequest) -> dict:
+async def block_ip(request: Request, body: BlockIPRequest) -> dict[str, Any]:
     """Block an attacking IP address."""
     session_factory = request.app.state.session_factory
 
@@ -129,7 +132,7 @@ async def block_ip(request: Request, body: BlockIPRequest) -> dict:
 
 
 @router.get("/blocked-ips/list")
-async def list_blocked_ips(request: Request) -> list[dict]:
+async def list_blocked_ips(request: Request) -> list[dict[str, Any]]:
     """List all blocked IP addresses."""
     session_factory = request.app.state.session_factory
 
@@ -149,7 +152,7 @@ async def list_blocked_ips(request: Request) -> list[dict]:
 
 
 @router.delete("/blocked-ips/{ip_address}")
-async def unblock_ip(request: Request, ip_address: str) -> dict:
+async def unblock_ip(request: Request, ip_address: str) -> Response | dict[str, Any]:
     """Remove an IP from the blocked list."""
     session_factory = request.app.state.session_factory
 
